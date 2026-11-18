@@ -26,7 +26,10 @@ npm run test:surveiller  # relance les tests à chaque modification
 ```text
 src/
   constantes.ts   statuts, onglets, mots-clés OUI/NON, paramètres par défaut
-  utils/          dates (fuseau Paris), téléphones, textes et détection OUI/NON
+  config.ts       lecture et vérification du .env
+  ports/          contrats Messagerie (WhatsApp), Tableur (Sheet), Horloge
+  utils/          dates (fuseau Paris), téléphones, textes et détection OUI/NON, logger
 tests/            tests Vitest (même arborescence que src/)
+  faux/           versions de test des contrats : fausse messagerie, faux Sheet, horloge contrôlée
 CLAUDE.md         cahier des charges et décisions du projet
 ```

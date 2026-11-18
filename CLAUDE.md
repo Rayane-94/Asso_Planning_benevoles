@@ -315,6 +315,21 @@ Côté développeurs (terminal du VPS) :
 > Étapes 1 à 3 de la v2 déjà faites en JavaScript Apps Script (utilitaires, harness). La v3 repart de ces acquis : la logique des utilitaires et leurs cas de test sont **portés en TypeScript**, le harness Apps Script est remplacé par des faux plus simples (on injecte les dépendances au lieu de simuler Google).
 > Pas encore de numéro de test : on code d'abord tout ce qui se teste avec les faux (étapes 1 à 4, puis 6 à 11), et on fait le spike WAHA dès qu'un numéro est disponible, **avant l'étape 5**.
 
+### Organisation Git : une branche par bloc d'étapes (décidé le 19/11/2026)
+
+- Une **branche par bloc** ; à l'intérieur, toujours **une étape = un commit**. En fin de bloc : pull request vers `main`, fusion quand la CI est verte, suppression de la branche.
+- `main` doit toujours rester propre et fonctionnel.
+
+| Bloc | Branche | Étapes | Statut |
+|---|---|---|---|
+| 1 | `migration-vps-typescript` | 1, 2 | ✅ fusionné (PR #1) |
+| 2 | `bloc-2-donnees-sheet` | 3, 4 | |
+| 3 | `bloc-3-whatsapp` | 0, 5 (numéro de test nécessaire) | |
+| 4 | `bloc-4-fonctionnalites` | 6 à 11 | |
+| 5 | `bloc-5-mise-en-production` | 12, 13 | |
+
+Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
+
 0. **Spike VPS + WAHA** (script jetable) : créer la machine Oracle, installer Docker, lancer WAHA, scanner le QR code avec le numéro de test, puis vérifier :
    - envoi dans un groupe de test et récupération de l'ID du message ;
    - réception par webhook d'un message de groupe qui cite ce message : présence de l'ID cité, **vrai numéro ou LID** de l'expéditeur ;
