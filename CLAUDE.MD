@@ -35,7 +35,7 @@ L'accueil des nouveaux bénévoles : message automatique, transcription et résu
 
 - **Aucun serveur à maintenir** : projet associatif, hébergement gratuit chez Google (Apps Script).
 - **WhatsApp via une API non officielle hébergée**, appelée en HTTP. **Décision du 18/11/2026** : l'asso paiera un fournisseur (~10 €/mois, ex. Green-API Business) pour lever la limite de conversations des offres gratuites (3 à 5 conversations, incompatible avec les messages privés). Fournisseur pas encore choisi. Le code doit permettre de **changer de fournisseur facilement** (voir [§3.2](#32-couche-whatsapp-interchangeable-adaptateur)).
-- **Solution hybride** : le paramètre `MODE_CONFIRMATION` (`prive` par défaut, ou `groupe`) permet de fonctionner aussi avec une offre gratuite limitée : en mode `groupe`, le bot ne parle qu'au groupe et au référent (voir [§4.4](#44-j-2--demande-de-confirmation-en-privé)).
+- **On conçoit pour l'offre payante** (messages privés illimités). L'offre gratuite du fournisseur (ex. Green-API Developer : 3 conversations) sert **uniquement aux tests** : groupe de test + 2 testeurs en privé. Pas de mode « tout dans le groupe » (idée écartée le 19/11/2026).
 - Option écartée : bot auto-hébergé (Node.js + Baileys sur un serveur) → trop de maintenance pour l'asso. GitHub Actions écarté comme hébergement (contraire aux conditions de GitHub) ; il sert uniquement à la CI/CD.
 - **Google Sheets comme tableau** : l'équipe consulte et corrige. Exportable en `.xlsx`.
 - Format de la liste finale **volontairement minimaliste** (voir [§4.5](#45-j-1-à-2000-heure_liste--confirmation-finale-et-liste)).
@@ -147,8 +147,6 @@ Lecture des réponses en privé :
 - OUI → **Confirmé** ; NON → **Désisté**. Le bot accuse réception (« C'est noté, merci ! »).
 - **Pas de relance.**
 
-**Variante `MODE_CONFIRMATION = groupe`** (offre gratuite) : pas de message privé aux bénévoles. À J-2, un seul message dans le groupe liste les inscrits (« Inscrits : Bob, Alice… Confirmez en répondant OUI ou NON en citant ce message ») ; les réponses citées passent les inscriptions à Confirmé / Désisté. Pas d'accusé de réception individuel, pas de « Nous vous confirmons » en privé, pas de demande de nom en privé (on garde le nom WhatsApp, corrigé par l'équipe dans Bénévoles). La liste finale, le récap et l'alerte au référent sont identiques.
-
 ### 4.5 J-1 à 20:00 (`HEURE_LISTE`) : confirmation finale et liste
 
 1. Les inscriptions encore **En attente** passent à **Sans réponse**.
@@ -222,7 +220,6 @@ Colonne Valeur au format texte (`@`).
 | `HEURE_LISTE` | 20:00 (la veille) |
 | `RECAP_ACTIF` / `JOUR_RECAP` / `HEURE_RECAP` | oui / vendredi / 20:30 |
 | `NUMERO_REFERENT` | (vide) |
-| `MODE_CONFIRMATION` | prive (ou groupe) |
 | `TYPES_ACTIONS` | Maraude, BP, Paniers anti-gaspi, Collecte, Événement, Ménage |
 | `TEXTE_ANNONCE`, `TEXTE_CONFIRMATION`, `TEXTE_VALIDATION` | Modèles avec des variables `{type}` `{date}` `{heure}` `{lieu}` `{prenom}` `{limite}` |
 
@@ -267,9 +264,9 @@ Colonne Valeur au format texte (`@`).
 
    Me faire un compte rendu avant de continuer.
 1. **Init du repo** : `package.json`, `.gitignore`, `.clasp.json.example`, `src/appsscript.json` (V8, Europe/Paris, scopes : `spreadsheets.currentonly`, `script.external_request`, `script.scriptapp`, `script.container.ui`), README minimal.
-2. **Config et utilitaires** : constantes, dates et heures, téléphones, modèles de texte avec variables, détection oui / non, Script Properties, Journal. Avec des tests unitaires.
+2. **Config et utilitaires** : constantes, dates et heures, téléphones, modèles de texte avec variables, détection oui / non. Avec des tests unitaires et la CI GitHub Actions.
 3. **Harness de test** : faux services Google, faux fournisseur WhatsApp, horloge contrôlée.
-4. **Couche Sheets** : lecture par en-têtes, écriture, paramètres, actions avec génération d'ID.
+4. **Couche Sheets** : lecture par en-têtes, écriture, paramètres, actions avec génération d'ID, Script Properties, Journal.
 5. **Interface WA**, adaptateur du fournisseur gratuit et déduplication.
 6. **Installation et menu** : onglets, validations, vues Présents/Absents, déclencheur, configuration de l'API, choix du groupe.
 7. **Annonces J-7** (avec rattrapage).
@@ -289,5 +286,5 @@ Colonne Valeur au format texte (`@`).
 - [ ] Les bénévoles n'ont qu'à répondre **OUI** à l'annonce, puis **OUI** à la confirmation.
 - [ ] **Aucun doublon** de message, même si un tick plante ou se relance.
 - [ ] On change de fournisseur WhatsApp en modifiant **une seule Script Property**.
-- [ ] Tout tourne sans serveur ; le seul coût est l'abonnement au fournisseur WhatsApp (0 € en mode `groupe` avec une offre gratuite).
+- [ ] Tout tourne sans serveur ; le seul coût est l'abonnement au fournisseur WhatsApp (~10 €/mois).
 - [ ] `npm test` simule une semaine complète et passe.
