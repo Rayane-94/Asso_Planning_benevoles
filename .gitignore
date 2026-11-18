@@ -1,0 +1,17 @@
+# Dépendances installées par npm (se recréent avec `npm install`)
+node_modules/
+
+# Config clasp propre à chaque développeur (contient l'ID du script)
+.clasp.json
+
+# Identifiants de connexion clasp : ne JAMAIS commiter
+.clasprc.json
+
+# Secrets éventuels en local
+.env
+.env.*
+
+# Fichiers système / éditeur
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,19 @@
+{
+  "name": "asso-planning-benevoles",
+  "version": "0.1.0",
+  "description": "Bot WhatsApp + Google Sheet qui automatise le planning des bénévoles d'une association",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test",
+    "login": "clasp login",
+    "push": "clasp push",
+    "open": "clasp open-script"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.4.1"
+  }
+}
