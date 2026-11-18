@@ -1,42 +1,41 @@
 /**
- * Config.js — Constantes du projet.
+ * constantes.ts — Ce qui ne change pas : noms des onglets, statuts, mots-clés.
  *
- * Ici, on ne met que ce qui ne change pas : noms des onglets, statuts, mots-clés.
  * Tout ce que l'asso doit pouvoir régler (heures, textes des messages…) est dans
  * l'onglet « Paramètres » du Sheet ; PARAMETRES_DEFAUT ne sert qu'à le pré-remplir.
  *
- * ⚠️ Rappel Apps Script : tous les fichiers de src/ partagent le même espace global.
- * Une constante définie ici est donc visible dans tous les autres fichiers.
- * Règle du projet : aucun fichier n'exécute de code au chargement (seulement des
- * déclarations de constantes et de fonctions). Ainsi, l'ordre de chargement des
- * fichiers n'a aucune importance.
+ * Astuce TypeScript : « as const » fige les valeurs ET permet d'en déduire des types.
+ * Par exemple, StatutAction n'accepte que les 5 statuts listés : une faute de frappe
+ * comme 'Anoncée' est refusée par `npm run types`.
  */
 
-/** Fuseau horaire utilisé pour tous les calculs de dates et d'heures. */
-const FUSEAU = 'Europe/Paris';
+/** Fuseau horaire de tous les calculs de dates (le serveur, lui, est en UTC). */
+export const FUSEAU = 'Europe/Paris';
 
 /** Noms des onglets du Google Sheet. */
-const ONGLETS = Object.freeze({
+export const ONGLETS = {
   ACTIONS: 'Actions',
   BENEVOLES: 'Bénévoles',
   INSCRIPTIONS: 'Inscriptions',
   PRESENTS: 'Présents',
   ABSENTS: 'Absents',
   PARAMETRES: 'Paramètres',
+  COMMANDES: 'Commandes',
   JOURNAL: 'Journal',
-});
+} as const;
 
 /** Statuts possibles d'une action (colonne « Statut » de l'onglet Actions). */
-const STATUT_ACTION = Object.freeze({
+export const STATUT_ACTION = {
   A_ANNONCER: '', // cellule vide = pas encore annoncée
   ANNONCEE: 'Annoncée',
   CONFIRMATIONS_ENVOYEES: 'Confirmations envoyées',
   LISTE_PUBLIEE: 'Liste publiée',
   ANNULEE: 'Annulée', // mis à la main par le référent
-});
+} as const;
+export type StatutAction = (typeof STATUT_ACTION)[keyof typeof STATUT_ACTION];
 
 /** Statuts possibles d'une inscription (colonne « Statut » de l'onglet Inscriptions). */
-const STATUT_INSCRIPTION = Object.freeze({
+export const STATUT_INSCRIPTION = {
   INSCRIT: 'Inscrit', // a répondu OUI à l'annonce
   EN_ATTENTE: 'En attente', // demande de confirmation envoyée (J-2)
   CONFIRME: 'Confirmé',
@@ -44,13 +43,15 @@ const STATUT_INSCRIPTION = Object.freeze({
   SANS_REPONSE: 'Sans réponse', // pas de réponse à la confirmation avant J-1 20:00
   NON_JOIGNABLE: 'Non joignable', // l'envoi du message privé a échoué
   RETIRE: 'Retiré', // a répondu NON à l'annonce
-});
+} as const;
+export type StatutInscription = (typeof STATUT_INSCRIPTION)[keyof typeof STATUT_INSCRIPTION];
 
-/** Résultat de la détection d'une réponse (voir detecterReponse_ dans Utils_Textes.js). */
-const REPONSE = Object.freeze({
+/** Résultat de la détection d'une réponse (voir detecterReponse dans utils/textes.ts). */
+export const REPONSE = {
   OUI: 'OUI',
   NON: 'NON',
-});
+} as const;
+export type Reponse = (typeof REPONSE)[keyof typeof REPONSE];
 
 /**
  * Expressions reconnues dans les réponses des bénévoles.
@@ -59,7 +60,7 @@ const REPONSE = Object.freeze({
  * Ordre de priorité : INCERTAIN, puis NON, puis OUI.
  * (« pas dispo » contient « dispo » : il faut donc tester NON avant OUI.)
  */
-const EXPRESSIONS_REPONSE = Object.freeze({
+export const EXPRESSIONS_REPONSE = {
   INCERTAIN: ['peut etre', 'je sais pas', 'je ne sais pas', 'sais pas', 'pas sur', 'pas sure', 'je verrai'],
   NON: [
     'non', 'nan', 'finalement non', 'peux plus', 'peux pas', 'pourrai pas', 'pourrais pas',
@@ -70,22 +71,22 @@ const EXPRESSIONS_REPONSE = Object.freeze({
     'oui', 'ouais', 'ok', 'okay', 'yes', 'yep', 'present', 'presente', 'je viens', 'dispo', 'disponible',
     'partant', 'partante', 'je serai la', 'avec plaisir', 'carrement', 'bien sur',
   ],
-});
+} as const;
 
 /** Emojis reconnus comme réponse (recherchés dans le texte brut). */
-const EMOJIS_REPONSE = Object.freeze({
+export const EMOJIS_REPONSE = {
   NON: ['👎', '❌'],
   OUI: ['👍', '✅', '🙋'],
-});
+} as const;
 
 /** Noms des jours, dans l'ordre de Date.getDay() (0 = dimanche). */
-const JOURS_SEMAINE = Object.freeze(['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']);
+export const JOURS_SEMAINE = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'] as const;
 
 /**
- * Valeurs par défaut de l'onglet Paramètres (utilisées à l'installation).
+ * Valeurs par défaut de l'onglet Paramètres (utilisées par `npm run installer-sheet`).
  * Variables disponibles dans les textes : {type} {date} {heure} {lieu} {prenom} {limite}
  */
-const PARAMETRES_DEFAUT = Object.freeze({
+export const PARAMETRES_DEFAUT = {
   JOURS_AVANT_ANNONCE: { valeur: '7', description: "Nombre de jours avant l'action pour publier l'annonce" },
   HEURE_ANNONCE: { valeur: '18:00', description: 'Heure de publication des annonces' },
   JOURS_AVANT_CONFIRMATION: { valeur: '2', description: "Nombre de jours avant l'action pour demander la confirmation" },
@@ -108,4 +109,5 @@ const PARAMETRES_DEFAUT = Object.freeze({
     valeur: '✅ Nous vous confirmons votre participation à : {type} – {date} à {heure} – {lieu}. Merci et à demain !',
     description: 'Confirmation finale en message privé, la veille',
   },
-});
+} as const;
+export type NomParametre = keyof typeof PARAMETRES_DEFAUT;
