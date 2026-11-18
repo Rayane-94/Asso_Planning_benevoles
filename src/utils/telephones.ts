@@ -1,13 +1,13 @@
 /**
- * Utils_Telephones.js — Numéros de téléphone.
+ * utils/telephones.ts — Numéros de téléphone.
  *
  * Format interne (la « clé » d'un bénévole) : E.164 sans le « + », uniquement des chiffres.
  *   ex. '33612345678' pour le 06 12 34 56 78
  * Format d'affichage (liste finale, Sheet) : '06 12 34 56 78' pour la France,
  *   '+32470123456' pour un numéro étranger.
  *
- * ⚠️ Dans le Sheet, les numéros doivent être écrits comme du texte (préfixe ').
- * Sinon « +33… » devient une formule et « 0612… » perd son 0.
+ * ⚠️ Dans le Sheet, les numéros doivent être écrits comme du texte, sinon « 0612… »
+ * devient un nombre et perd son 0 (voir CLAUDE.md §6).
  */
 
 /**
@@ -15,17 +15,16 @@
  * Hypothèse : un numéro à 10 chiffres commençant par 0 est français.
  *
  * Exemples :
- *   '06 12 34 56 78'      → '33612345678'
- *   '+33 6 12 34 56 78'   → '33612345678'
- *   '+33 (0)6 12 34 56 78'→ '33612345678'
- *   '0033612345678'       → '33612345678'
- *   '612345678'           → '33612345678'  (0 de tête perdu par le Sheet)
- *   '+32 470 12 34 56'    → '32470123456'
+ *   '06 12 34 56 78'       → '33612345678'
+ *   '+33 6 12 34 56 78'    → '33612345678'
+ *   '+33 (0)6 12 34 56 78' → '33612345678'
+ *   '0033612345678'        → '33612345678'
+ *   612345678 (nombre)     → '33612345678'  (0 de tête perdu par le Sheet)
+ *   '+32 470 12 34 56'     → '32470123456'
  *
- * @param {string|number} brut
- * @return {string|null} la clé, ou null si ce n'est pas un numéro plausible
+ * @return la clé, ou null si ce n'est pas un numéro plausible
  */
-function normaliserTelephone_(brut) {
+export function normaliserTelephone(brut: string | number | null | undefined): string | null {
   if (brut === null || brut === undefined) return null;
   const texte = String(brut).trim();
   const avecPlus = texte.startsWith('+');
@@ -53,13 +52,11 @@ function normaliserTelephone_(brut) {
  * Format lisible d'une clé de téléphone.
  *   '33612345678' → '06 12 34 56 78'
  *   '32470123456' → '+32470123456'
- * @param {string} cle
- * @return {string}
  */
-function formaterTelephone_(cle) {
+export function formaterTelephone(cle: string): string {
   if (/^33\d{9}$/.test(cle)) {
     const national = '0' + cle.slice(2); // '0612345678'
-    return national.match(/\d{2}/g).join(' ');
+    return (national.match(/\d{2}/g) ?? []).join(' ');
   }
   return '+' + cle;
 }

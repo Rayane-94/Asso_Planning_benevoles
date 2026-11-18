@@ -1,0 +1,26 @@
+{
+  // Configuration TypeScript.
+  // Node 24 exécute les fichiers .ts directement (il « efface » les types au lancement) :
+  // il n'y a donc PAS de compilation. `tsc` sert uniquement à VÉRIFIER les types
+  // (commande : npm run types).
+  "compilerOptions": {
+    // Vérifications strictes : le maximum d'erreurs détectées avant l'exécution.
+    "strict": true,
+
+    // JavaScript moderne, modules ES (import/export), comme Node 24.
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+
+    // Indispensable pour que Node puisse lancer les .ts sans compilation :
+    "noEmit": true, // tsc ne produit aucun fichier
+    "allowImportingTsExtensions": true, // on écrit import ... from './dates.ts'
+    "erasableSyntaxOnly": true, // interdit les syntaxes que Node ne sait pas effacer (enum, namespace…)
+    "verbatimModuleSyntax": true, // oblige à écrire « import type » pour les imports de types
+
+    "skipLibCheck": true
+  },
+  "include": ["src", "tests"]
+}

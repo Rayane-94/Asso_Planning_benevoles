@@ -57,7 +57,7 @@ L'accueil des nouveaux bénévoles : message automatique, transcription et résu
 | Besoin | Choix | Pourquoi |
 |---|---|---|
 | Langage | **TypeScript** (mode `strict`) sur **Node.js 24** | Typage = moins de bugs, lisible ; Node 24 = version LTS |
-| Serveur HTTP (réception des webhooks WAHA) | **Fastify** | Léger, bien typé |
+| Serveur HTTP (réception des webhooks WAHA) | **Express** | Le plus connu et documenté : facile à reprendre pour un junior |
 | Google Sheets | **googleapis** (bibliothèque officielle) + compte de service | Officielle, maintenue par Google |
 | Tests | **Vitest** | Gère TypeScript sans configuration, horloge simulée intégrée |
 | Lancement | **Docker Compose** : 2 conteneurs, `waha` et `bot` | Une commande pour tout démarrer, redémarrage automatique |
@@ -123,7 +123,7 @@ Structure prévue :
 src/
   index.ts               point d'entrée : branche tout et démarre
   config.ts              lecture et vérification des variables d'environnement
-  serveur.ts             Fastify : POST /webhook/waha, GET /sante
+  serveur.ts             Express : POST /webhook/waha, GET /sante
   planificateur.ts       tick() toutes les minutes
   constantes.ts          statuts, onglets, mots-clés OUI/NON, paramètres par défaut
   utils/                 dates, telephones, textes (fonctions pures)
@@ -327,7 +327,7 @@ Côté développeurs (terminal du VPS) :
 2. **Configuration** : `config.ts` (lecture et vérification du `.env`, message clair si une variable manque), `constantes.ts`, `.env.example`, logger console.
 3. **Ports et faux** : interfaces `Messagerie`, `Horloge`, `Tableur` ; faux en mémoire pour les tests (faux Sheet, fausse messagerie, horloge contrôlée).
 4. **Couche Google Sheets** : accès par en-têtes, un module par onglet, Paramètres, Journal, génération d'ID ; script `installer-sheet` ; création du compte de service (guide pas à pas).
-5. **Adaptateur WAHA + serveur** : envoi, citation, groupes, vérification de connexion, conversion des webhooks en `MessageRecu`, gestion des LID, déduplication, état local ; serveur Fastify (`/webhook/waha`, `/sante`) ; script `lister-groupes`.
+5. **Adaptateur WAHA + serveur** : envoi, citation, groupes, vérification de connexion, conversion des webhooks en `MessageRecu`, gestion des LID, déduplication, état local ; serveur Express (`/webhook/waha`, `/sante`) ; script `lister-groupes`.
 6. **Planificateur et annonces J-7** (avec rattrapage).
 7. **Réception** : réponses citées dans le groupe (oui / non), demande de nom en privé aux numéros inconnus.
 8. **Confirmations J-2** et lecture des réponses en privé (une ou plusieurs demandes en attente).

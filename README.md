@@ -1,30 +1,32 @@
 # Bot planning bénévoles (WhatsApp + Google Sheet)
 
-Automatise le planning des bénévoles d'une association : annonce des actions dans le groupe WhatsApp, inscriptions par « OUI », confirmations, liste finale des présents. Le tout piloté depuis un Google Sheet. 
+Automatise le planning des bénévoles d'une association : annonce des actions dans le groupe WhatsApp, inscriptions par « OUI », confirmations, liste finale des présents. Le tout piloté depuis un Google Sheet.
 
-> 🚧 Projet en cours de construction. Le contexte complet et les décisions sont dans [CLAUDE.MD](CLAUDE.MD).
+> 🚧 Projet en cours de construction. Le contexte complet et les décisions sont dans [CLAUDE.md](CLAUDE.md).
 
 ## Stack
 
-- **Google Apps Script** (JavaScript, runtime V8) attaché au Google Sheet : aucun serveur à gérer.
-- **clasp** pour envoyer le code de `src/` vers Apps Script.
-- **Node.js** (≥ 20) pour lancer les tests en local, sans dépendance (`node --test`).
-- **API WhatsApp hébergée** appelée en HTTP, derrière un adaptateur interchangeable.
+- **Node.js 24 + TypeScript** : Node exécute les fichiers `.ts` directement, sans compilation ; `tsc` sert seulement à vérifier les types.
+- **WAHA** (API WhatsApp open source) et le bot tournent en **Docker** sur un VPS Oracle Cloud.
+- **Google Sheets** comme interface pour l'équipe (accès via l'API Google).
+- **Vitest** pour les tests, **GitHub Actions** pour la CI.
 
 ## Démarrage (développeur)
 
 ```bash
-npm install            # installe clasp en local
-npm test               # lance les tests
-npx clasp login        # connexion au compte Google (une seule fois)
-cp .clasp.json.example .clasp.json   # puis coller l'ID du script
-npm run push           # envoie src/ vers Apps Script
+npm install          # installe les dépendances
+npm test             # lance les tests
+npm run types        # vérifie les types TypeScript
+npm run verifier     # les deux (c'est ce que fait la CI)
+npm run test:surveiller  # relance les tests à chaque modification
 ```
 
 ## Structure
 
 ```text
-src/            Code envoyé à Apps Script (+ appsscript.json : le manifeste)
-tests/          Tests locaux Node
-CLAUDE.MD       Cahier des charges et décisions du projet
+src/
+  constantes.ts   statuts, onglets, mots-clés OUI/NON, paramètres par défaut
+  utils/          dates (fuseau Paris), téléphones, textes et détection OUI/NON
+tests/            tests Vitest (même arborescence que src/)
+CLAUDE.md         cahier des charges et décisions du projet
 ```
