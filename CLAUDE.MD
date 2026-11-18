@@ -8,7 +8,8 @@
 
 ## 0. Mode de travail (à respecter)
 
-- C'est moi (Rayane) qui code et qui commit. Tu m'accompagnes **étape par étape : une étape correspond à un commit**.
+- C'est moi (Rayane) qui commit. **Claude écrit les fichiers** et m'explique chaque bloc ; je relis, je teste et je commite. Tu m'accompagnes **étape par étape : une étape correspond à un commit**.
+- Explique les termes techniques (spike, quota, adaptateur…) la première fois qu'ils apparaissent.
 - Avant chaque étape, explique brièvement ce qu'on fait et pourquoi. Ensuite, on code. Puis tu me proposes un message de commit (**Conventional Commits, en français**).
 - **Attends ma validation** avant de passer à l'étape suivante. Ne génère jamais tout le projet d'un coup.
 - Si une décision n'est pas couverte par ce fichier, **pose-moi la question** au lieu de deviner.
@@ -32,8 +33,10 @@ L'accueil des nouveaux bénévoles : message automatique, transcription et résu
 
 ## 2. Contraintes
 
-- **100 % gratuit** : projet associatif, aucun serveur payant.
-- **WhatsApp via une API non officielle hébergée**, appelée en HTTP, gratuite. En plan B, un fournisseur payant du même type si la gratuite casse. Le code doit donc permettre de **changer de fournisseur facilement** (voir [§3.2](#32-couche-whatsapp-interchangeable-adaptateur)).
+- **Aucun serveur à maintenir** : projet associatif, hébergement gratuit chez Google (Apps Script).
+- **WhatsApp via une API non officielle hébergée**, appelée en HTTP. **Décision du 18/11/2026** : l'asso paiera un fournisseur (~10 €/mois, ex. Green-API Business) pour lever la limite de conversations des offres gratuites (3 à 5 conversations, incompatible avec les messages privés). Fournisseur pas encore choisi. Le code doit permettre de **changer de fournisseur facilement** (voir [§3.2](#32-couche-whatsapp-interchangeable-adaptateur)).
+- **Solution hybride** : le paramètre `MODE_CONFIRMATION` (`prive` par défaut, ou `groupe`) permet de fonctionner aussi avec une offre gratuite limitée : en mode `groupe`, le bot ne parle qu'au groupe et au référent (voir [§4.4](#44-j-2--demande-de-confirmation-en-privé)).
+- Option écartée : bot auto-hébergé (Node.js + Baileys sur un serveur) → trop de maintenance pour l'asso. GitHub Actions écarté comme hébergement (contraire aux conditions de GitHub) ; il sert uniquement à la CI/CD.
 - **Google Sheets comme tableau** : l'équipe consulte et corrige. Exportable en `.xlsx`.
 - Format de la liste finale **volontairement minimaliste** (voir [§4.5](#45-j-1-à-2000-heure_liste--confirmation-finale-et-liste)).
 - **Aucune maintenance technique pour l'asso** : réglages dans le Sheet.
@@ -47,7 +50,7 @@ L'accueil des nouveaux bénévoles : message automatique, transcription et résu
 - **Google Apps Script** attaché au Google Sheet (container-bound), runtime **V8**, fuseau **Europe/Paris**. Hébergement gratuit chez Google, sans serveur. Le script tourne sous le compte Google de l'asso.
 - **Repo GitHub et clasp** (`@google/clasp`) : je code dans `src/`, puis `clasp push`. Le fichier `.clasp.json` (`"rootDir": "src"`) est gitignoré, avec un `.clasp.json.example` commité.
 - **Tests locaux avec Node** (`node --test`, zéro dépendance) : faux `SpreadsheetApp`, `UrlFetchApp`, `PropertiesService`, `Utilities`, `LockService`, `ScriptApp`, plus un faux fournisseur WhatsApp, le tout dans un contexte `vm` avec une horloge contrôlée. On simule une semaine complète.
-- **Déclencheur temporel toutes les minutes** qui lance `tick()` : réception des messages, puis jobs planifiés (annonces, confirmations, listes, récap).
+- **Déclencheur temporel toutes les 15 minutes** (quota Apps Script gratuit : 90 min de calcul par jour pour les déclencheurs ; un tick toutes les minutes avec appel HTTP risquerait de le dépasser) qui lance `tick()` : réception des messages, puis jobs planifiés (annonces, confirmations, listes, récap).
   - `LockService` évite les exécutions simultanées.
   - Chaque étape de `tick()` est isolée dans un `try/catch` qui log dans l'onglet **Journal**.
 
@@ -144,6 +147,8 @@ Lecture des réponses en privé :
 - OUI → **Confirmé** ; NON → **Désisté**. Le bot accuse réception (« C'est noté, merci ! »).
 - **Pas de relance.**
 
+**Variante `MODE_CONFIRMATION = groupe`** (offre gratuite) : pas de message privé aux bénévoles. À J-2, un seul message dans le groupe liste les inscrits (« Inscrits : Bob, Alice… Confirmez en répondant OUI ou NON en citant ce message ») ; les réponses citées passent les inscriptions à Confirmé / Désisté. Pas d'accusé de réception individuel, pas de « Nous vous confirmons » en privé, pas de demande de nom en privé (on garde le nom WhatsApp, corrigé par l'équipe dans Bénévoles). La liste finale, le récap et l'alerte au référent sont identiques.
+
 ### 4.5 J-1 à 20:00 (`HEURE_LISTE`) : confirmation finale et liste
 
 1. Les inscriptions encore **En attente** passent à **Sans réponse**.
@@ -174,6 +179,11 @@ Une réponse « NON » (ou « je peux plus ») reçue en privé après la public
 - `JOUR_RECAP` (vendredi) à `HEURE_RECAP` (20:30) : un message dans le groupe avec les actions du samedi au vendredi suivant et le nombre d'inscrits ou de confirmés pour chacune.
 - Désactivable avec `RECAP_ACTIF = non`.
 - **Pas de limite de places** pour l'instant (« plus il y en a, mieux c'est »). On ajustera plus tard si besoin, mais il faut garder une colonne **Places** facultative dans Actions.
+
+### 4.8 Annulation et modification d'une action (décidé le 18/11/2026)
+
+- **Annulation** : le référent met le statut **Annulée** et prévient les bénévoles **à la main**. Le bot ignore ensuite les réponses à cette annonce. Pas d'autre automatisation.
+- **Modification** (date, heure, lieu) : les bénévoles sont prévenus **à la main**. Le bot ne renvoie aucun message automatique.
 
 ---
 
@@ -212,12 +222,13 @@ Colonne Valeur au format texte (`@`).
 | `HEURE_LISTE` | 20:00 (la veille) |
 | `RECAP_ACTIF` / `JOUR_RECAP` / `HEURE_RECAP` | oui / vendredi / 20:30 |
 | `NUMERO_REFERENT` | (vide) |
+| `MODE_CONFIRMATION` | prive (ou groupe) |
 | `TYPES_ACTIONS` | Maraude, BP, Paniers anti-gaspi, Collecte, Événement, Ménage |
 | `TEXTE_ANNONCE`, `TEXTE_CONFIRMATION`, `TEXTE_VALIDATION` | Modèles avec des variables `{type}` `{date}` `{heure}` `{lieu}` `{prenom}` `{limite}` |
 
 ### Menu « 🤖 Bénévoles » (`onOpen`)
 
-- **Installer / réparer** : onglets, formats, validations, vues QUERY, déclencheur `tick` toutes les minutes. Idempotent.
+- **Installer / réparer** : onglets, formats, validations, vues QUERY, déclencheur `tick` toutes les 15 minutes. Idempotent.
 - **Configurer l'API WhatsApp** : fournisseur, URL, token, test avec `WA.ping()`.
 - **Choisir le groupe** : `WA.listGroups()`, puis saisie ou choix du groupe, stocké dans `GROUP_ID`.
 - **Annoncer maintenant** / **Envoyer les confirmations maintenant** / **Publier la liste de demain maintenant** / **Envoyer le récap maintenant**.
@@ -239,13 +250,15 @@ Colonne Valeur au format texte (`@`).
 - **`setFormula`** attend la syntaxe anglaise avec des virgules, même si le Sheet est en français.
 - **Tests dans `vm`** : passer le `Date` de l'hôte dans le contexte (`ctx.Date = Date`), sinon `instanceof Date` échoue. Remplacer `now_()` pour contrôler l'horloge.
 - **Idempotence** : un job ne s'exécute qu'une fois grâce aux statuts des actions et à des marqueurs par jour. Un tick qui plante puis se relance ne doit **jamais** renvoyer un message.
-- **Quotas Apps Script** (compte gratuit) : 90 min par jour d'exécution des déclencheurs, et 6 min maximum par exécution. Un tick ≈ 1 s. Pour 50 messages privés espacés de 2 s, compter environ 100 s : OK.
+- **Quotas Apps Script** (compte gratuit) : 90 min par jour d'exécution des déclencheurs, et 6 min maximum par exécution. Un tick ≈ 1 à 3 s (appel HTTP de réception) ; à 15 min d'intervalle, 96 ticks/jour ≈ 5 min : OK. Pour 50 messages privés espacés de 2 s, compter environ 100 s par exécution : OK.
 
 ---
 
 ## 7. Plan de développement (une étape = un commit)
 
-0. **Spike API** (avant tout code métier) : avec le fournisseur gratuit, en script jetable, vérifier :
+> **Ordre ajusté (18/11/2026)** : pas encore de numéro de test ni de fournisseur choisi. On commence par les étapes 1 à 4, qui n'ont pas besoin de WhatsApp (faux fournisseur dans les tests). Le spike (étape 0) est fait **avant l'étape 5** (adaptateur). La CI GitHub Actions (`npm test` à chaque push) est ajoutée dès que des tests existent (étape 2).
+
+0. **Spike API** (avant l'adaptateur) : avec le fournisseur choisi, en script jetable, vérifier :
    - envoi dans le groupe et récupération de l'ID du message ;
    - réception d'un message du groupe qui cite ce message, avec le **vrai numéro** de l'expéditeur (et pas un LID) ;
    - envoi et réception en privé ;
@@ -276,5 +289,5 @@ Colonne Valeur au format texte (`@`).
 - [ ] Les bénévoles n'ont qu'à répondre **OUI** à l'annonce, puis **OUI** à la confirmation.
 - [ ] **Aucun doublon** de message, même si un tick plante ou se relance.
 - [ ] On change de fournisseur WhatsApp en modifiant **une seule Script Property**.
-- [ ] Tout est gratuit (hors plan B) et tourne sans serveur.
+- [ ] Tout tourne sans serveur ; le seul coût est l'abonnement au fournisseur WhatsApp (0 € en mode `groupe` avec une offre gratuite).
 - [ ] `npm test` simule une semaine complète et passe.
