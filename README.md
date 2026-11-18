@@ -1,6 +1,6 @@
 # Bot planning bénévoles (WhatsApp + Google Sheet)
 
-Automatise le planning des bénévoles d'une association : annonce des actions dans le groupe WhatsApp, inscriptions par « OUI », confirmations, liste finale des présents. Le tout piloté depuis un Google Sheet.
+Automatise le planning des bénévoles d'une association : annonce des actions dans le groupe WhatsApp, inscriptions par « OUI », confirmations, liste finale des présents. Le tout piloté depuis un Google Sheet. 
 
 > 🚧 Projet en cours de construction. Le contexte complet et les décisions sont dans [CLAUDE.MD](CLAUDE.MD).
 
