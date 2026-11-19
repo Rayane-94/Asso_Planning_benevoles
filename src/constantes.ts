@@ -12,6 +12,21 @@
 /** Fuseau horaire de tous les calculs de dates (le serveur, lui, est en UTC). */
 export const FUSEAU = 'Europe/Paris';
 
+/** Pause entre deux messages envoyés à la suite (évite les rafales, suspectes pour WhatsApp). */
+export const PAUSE_ENTRE_MESSAGES_MS = 2000;
+
+/**
+ * Aucun envoi AUTOMATIQUE après cette heure (on ne réveille pas les bénévoles la nuit).
+ * Les commandes manuelles de l'onglet Commandes ne sont pas concernées.
+ */
+export const HEURE_FIN_ENVOIS_AUTO = '22:00';
+
+/**
+ * Écrit dans « Message ID » juste AVANT d'envoyer une annonce. Si le bot plante entre
+ * l'envoi et l'enregistrement, ce marqueur empêche de renvoyer l'annonce en double.
+ */
+export const MARQUEUR_ENVOI_EN_COURS = 'envoi-en-cours';
+
 /** Noms des onglets du Google Sheet. */
 export const ONGLETS = {
   ACTIONS: 'Actions',
