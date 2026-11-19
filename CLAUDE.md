@@ -328,13 +328,15 @@ Côté développeurs (terminal du VPS) :
 |---|---|---|---|
 | 1 | `migration-vps-typescript` | 1, 2 | ✅ fusionné (PR #1) |
 | 2 | `donnees-sheet` | 3, 4 | ✅ fusionné (PR #2) |
-| 3 | `bloc-3-whatsapp` | 0, 5 (numéro de test nécessaire) | |
+| 3 | `bloc-3-whatsapp` | 0, 5 — **en local** (Docker Desktop sur le PC de Rayane, son numéro perso, groupe de test) | |
 | 4 | `bloc-4-fonctionnalites` | 6 à 11 | terminé (fait avant le bloc 3 : pas encore de numéro de test) — PR à fusionner |
 | 5 | `bloc-5-mise-en-production` | 12, 13 | |
 
 Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 
-0. **Spike VPS + WAHA** (script jetable) : créer la machine Oracle, installer Docker, lancer WAHA, scanner le QR code avec le numéro de test, puis vérifier :
+> **Décision (19/11/2026)** : tout le bloc 3 se fait d'abord **en local**, sur le PC de Rayane avec **Docker Desktop** (WAHA en conteneur, le bot lancé avec Node, webhook vers `http://host.docker.internal:3000/webhook/waha`), avec son numéro perso et un groupe de test. Le VPS Oracle n'arrive qu'au bloc 5, avec le **même** `docker-compose.yml`. Raisons : gratuit, itérations rapides, un problème à la fois (WhatsApp d'abord, serveur ensuite).
+
+0. **Spike WAHA en local** (script jetable) : lancer WAHA dans Docker Desktop, scanner le QR code avec le numéro de test, puis vérifier :
    - envoi dans un groupe de test et récupération de l'ID du message ;
    - réception par webhook d'un message de groupe qui cite ce message : présence de l'ID cité, **vrai numéro ou LID** de l'expéditeur ;
    - envoi et réception en privé ;
