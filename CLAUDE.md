@@ -344,6 +344,18 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
    - consommation mémoire et CPU sur la machine ARM.
 
    Me faire un compte rendu avant de continuer.
+
+   **Compte rendu du spike (19/11/2026, WAHA 2026.10.1 CORE, moteur GOWS, Docker Desktop)** :
+   - ✅ **Citations** : une réponse citée arrive avec `payload.replyTo.id` = ID **court** du message cité (ex. `AC43B61D…`). WAHA a aussi un ID **long** (`true_<chat>_<IDcourt>_<expéditeur>`) : l'adaptateur doit toujours manipuler l'ID court (`payload._data.Info.ID`).
+   - ⚠️ **LID confirmé** : dans les groupes ET en privé, l'expéditeur arrive en `…@lid` (`participant` en groupe, `from` en privé ; `AddressingMode: "lid"`).
+   - ✅ **Mais le vrai numéro est fourni** par GOWS dans `payload._data.Info.SenderAlt` (`…@s.whatsapp.net`), en groupe comme en privé. → **on garde le moteur GOWS**. Si `SenderAlt` manque : `telephone = null` (déjà géré : avertissement, inscription à la main).
+   - ⚠️ **Point à surveiller** : testé uniquement avec un expéditeur présent dans les contacts du bot. À revérifier au premier test réel avec des bénévoles inconnus du numéro (le numéro dédié de l'asso n'aura aucun contact).
+   - ✅ Nom WhatsApp dans `payload._data.Info.PushName`. Groupe : `payload.from` = `…@g.us`. Privé : `_data.Info.IsGroup = false`.
+   - ✅ Les messages envoyés par le compte du bot arrivent aussi (`fromMe: true`) → en production, s'abonner à l'événement `message` (sans les siens) et filtrer `fromMe` par sécurité.
+   - Événement `session.status` : STARTING → SCAN_QR_CODE → WORKING (utile pour la surveillance).
+   - Non testé : l'ENVOI par l'API (format de la réponse de `sendText`) → vérifié pendant l'étape 5. Consommation sur ARM → au bloc 5.
+
+7b. **OUI sans citation dans le groupe** (compromis validé le 19/11/2026) : un message **court** (≤ 3 mots) détecté comme OUI, **sans citation**, est accepté **s'il n'y a qu'une seule action ouverte** (Annoncée ou Confirmations envoyées, pas encore passée) ; le bot inscrit et envoie en privé « ✅ C'est noté, tu es inscrit(e) pour … Si ce n'était pas pour ça, réponds NON. » (sauf si la demande de confirmation part déjà). S'il y a **plusieurs** actions ouvertes : pas d'inscription, message privé demandant de citer l'annonce. Un NON sans citation dans le groupe reste ignoré (trop ambigu en conversation) ; un **NON en privé** d'un « Inscrit » (avant les confirmations) le retire.
 1. **Migration vers TypeScript** : `package.json`, `tsconfig.json` (strict), Vitest, scripts `npm run verifier` (types + tests), CI mise à jour ; suppression des fichiers Apps Script (`appsscript.json`, clasp, harness Google) ; portage des utilitaires (dates, téléphones, textes, détection oui/non) et de leurs tests.
 2. **Configuration** : `config.ts` (lecture et vérification du `.env`, message clair si une variable manque), `constantes.ts`, `.env.example`, logger console.
 3. **Ports et faux** : interfaces `Messagerie`, `Horloge`, `Tableur` ; faux en mémoire pour les tests (faux Sheet, fausse messagerie, horloge contrôlée).
