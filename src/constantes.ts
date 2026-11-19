@@ -21,6 +21,9 @@ export const PAUSE_ENTRE_MESSAGES_MS = 2000;
  */
 export const HEURE_FIN_ENVOIS_AUTO = '22:00';
 
+/** Aucun envoi AUTOMATIQUE avant cette heure (rattrapage après une panne de nuit, par ex.). */
+export const HEURE_DEBUT_ENVOIS_AUTO = '08:00';
+
 /**
  * Écrit dans « Message ID » juste AVANT d'envoyer une annonce. Si le bot plante entre
  * l'envoi et l'enregistrement, ce marqueur empêche de renvoyer l'annonce en double.
@@ -66,6 +69,10 @@ export const MESSAGES = {
   DEMANDE_NOM: 'Bienvenue ! Pour la liste des présents, peux-tu me donner ton prénom et ton nom ?',
   /** {prenom} est remplacé par le prénom reçu. */
   MERCI_NOM: "Merci {prenom}, c'est noté !",
+  /** Après un OUI / NON en privé à une demande de confirmation. */
+  ACCUSE_RECEPTION: "C'est noté, merci !",
+  /** La personne a plusieurs demandes en attente et n'a pas cité laquelle. */
+  CITER_LE_MESSAGE: 'Tu as plusieurs actions en attente, réponds en citant le message concerné (appui long → Répondre).',
 } as const;
 
 /** Commandes manuelles de l'onglet Commandes (remplacent le menu Apps Script, voir CLAUDE.md §5). */

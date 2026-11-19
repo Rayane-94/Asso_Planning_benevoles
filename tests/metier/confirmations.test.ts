@@ -1,0 +1,246 @@
+/**
+ * Confirmations J-2 (CLAUDE.md §4.4). Scénario : le BP du samedi 28/11 est annoncé,
+ * Bob et Alice sont inscrits. Jeudi 26/11 = J-2 ; vendredi 27/11 = J-1.
+ */
+import { describe, expect, test } from 'vitest';
+import { recevoirMessage } from '../../src/metier/reception.ts';
+import { GROUPE_TEST } from '../faux/fausseMessagerie.ts';
+import { ajouterAction, contexteDeTest, logsDeNiveau, type EnvironnementDeTest } from '../faux/contexteDeTest.ts';
+import { ajouterLignesDeTest } from '../faux/sheetDeTest.ts';
+
+const BOB = '33612345678';
+const ALICE = '33611223344';
+const ANNONCE_BP = 'annonce-bp';
+const DEMANDE_BOB =
+  "Bonjour Bob 👋 Tu t'es inscrit(e) pour : BP – samedi 28/11 à 14:00 – Entrepôt.\n" +
+  'Tu confirmes ta présence ? Réponds OUI ou NON (avant vendredi 20:00).';
+
+/** BP du 28/11 annoncé, Bob et Alice inscrits. */
+async function preparer(depart = '2026-11-26 10:00'): Promise<EnvironnementDeTest> {
+  const env = await contexteDeTest(depart);
+  await ajouterAction(env, {
+    ID: 'A-0001', Type: 'BP', Date: '28/11/2026', Heure: '14:00', Lieu: 'Entrepôt', Statut: 'Annoncée', 'Message ID': ANNONCE_BP,
+  });
+  await ajouterLignesDeTest(env.tableur, 'Bénévoles', [
+    { Téléphone: '06 12 34 56 78', Prénom: 'Bob', Nom: 'Durand' },
+    { Téléphone: '06 11 22 33 44', Prénom: 'Alice', Nom: 'Martin' },
+  ]);
+  await ajouterLignesDeTest(env.tableur, 'Inscriptions', [
+    { ID: 'I-00001', 'Action ID': 'A-0001', Type: 'BP', Date: '2026-11-28', Heure: '14:00', Lieu: 'Entrepôt', Téléphone: '06 12 34 56 78', Nom: 'Durand Bob', Statut: 'Inscrit' },
+    { ID: 'I-00002', 'Action ID': 'A-0001', Type: 'BP', Date: '2026-11-28', Heure: '14:00', Lieu: 'Entrepôt', Téléphone: '06 11 22 33 44', Nom: 'Martin Alice', Statut: 'Inscrit' },
+  ]);
+  return env;
+}
+
+const statuts = (env: EnvironnementDeTest) => env.tableur.lignes('Inscriptions').map((l) => `${l.Nom} : ${l.Statut}`);
+const statutAction = (env: EnvironnementDeTest) => env.tableur.lignes('Actions')[0].Statut;
+
+describe('envoi des demandes à J-2', () => {
+  test('jeudi 10:00 : chaque inscrit reçoit sa demande en privé, personnalisée', async () => {
+    const env = await preparer();
+    await env.planificateur.tick();
+
+    expect(env.messagerie.envoyesA(BOB).map((m) => m.texte)).toEqual([DEMANDE_BOB]);
+    expect(env.messagerie.envoyesA(ALICE)[0].texte).toContain('Bonjour Alice 👋');
+    expect(env.messagerie.envoyesA(GROUPE_TEST)).toEqual([]); // rien dans le groupe
+  });
+
+  test('les inscriptions passent « En attente » avec l\'ID de la demande ; l\'action « Confirmations envoyées »', async () => {
+    const env = await preparer();
+    await env.planificateur.tick();
+
+    expect(statuts(env)).toEqual(['Durand Bob : En attente', 'Martin Alice : En attente']);
+    expect(env.tableur.lignes('Inscriptions')[0]['Demande ID']).toBe(env.messagerie.envoyesA(BOB)[0].id);
+    expect(statutAction(env)).toBe('Confirmations envoyées');
+  });
+
+  test('messages espacés de 2 secondes ; résultats écrits en peu de requêtes (quota Google)', async () => {
+    const env = await preparer();
+    await env.planificateur.tick();
+    expect(env.horloge.pauses).toEqual([2000]);
+    // marqueur (1) + résultats (1) + statut de l'action (1) = 3 écritures pour 2 personnes
+    expect(env.tableur.appels.ecritures).toBe(3);
+  });
+
+  test('avant 10:00 : rien ; mercredi (J-3) : rien', async () => {
+    const env = await preparer('2026-11-26 09:59');
+    await env.planificateur.tick();
+    env.horloge.regler('2026-11-25 12:00');
+    await env.planificateur.tick();
+    expect(env.messagerie.envoyes).toEqual([]);
+  });
+
+  test('ticks suivants : aucune demande renvoyée', async () => {
+    const env = await preparer();
+    for (let i = 0; i < 5; i++) {
+      await env.planificateur.tick();
+      env.horloge.avancer({ minutes: 1 });
+    }
+    expect(env.messagerie.envoyes).toHaveLength(2);
+  });
+
+  test('seuls les « Inscrit » sont contactés (pas ceux qui ont dit NON)', async () => {
+    const env = await preparer();
+    await env.tableur.modifierLignes('Inscriptions', [{ numero: 3, valeurs: { Statut: 'Retiré' } }]);
+    await env.planificateur.tick();
+    expect(env.messagerie.envoyes.map((m) => m.destinataire)).toEqual([BOB]);
+  });
+
+  test('aucun inscrit : l\'action passe quand même à « Confirmations envoyées »', async () => {
+    const env = await contexteDeTest('2026-11-26 10:00');
+    await ajouterAction(env, { ID: 'A-0001', Type: 'BP', Date: '28/11/2026', Heure: '14:00', Statut: 'Annoncée', 'Message ID': 'x' });
+    await env.planificateur.tick();
+    expect(statutAction(env)).toBe('Confirmations envoyées');
+  });
+
+  test('envoi impossible : « Non joignable », les autres sont quand même contactés', async () => {
+    const env = await preparer();
+    env.messagerie.faireEchouerEnvoisVers(BOB);
+    await env.planificateur.tick();
+    expect(statuts(env)).toEqual(['Durand Bob : Non joignable', 'Martin Alice : En attente']);
+    expect(logsDeNiveau(env, 'AVERTISSEMENT')[0]).toContain('Demande de confirmation non envoyée à Durand Bob');
+  });
+
+  test('bénévole sans prénom : « Bonjour 👋 » (pas de trou, pas de {prenom})', async () => {
+    const env = await preparer();
+    await env.tableur.modifierLignes('Bénévoles', [{ numero: 2, valeurs: { Prénom: '', Nom: '' } }]);
+    await env.planificateur.tick();
+    expect(env.messagerie.envoyesA(BOB)[0].texte.startsWith("Bonjour 👋 Tu t'es inscrit(e)")).toBe(true);
+  });
+});
+
+describe('rattrapage (bot arrêté le jeudi)', () => {
+  test.each([
+    ['2026-11-27 09:00', 'vendredi 09:00', true],
+    ['2026-11-27 19:59', 'vendredi 19:59', true],
+    ['2026-11-27 20:00', 'vendredi 20:00 (heure de la liste)', false],
+    ['2026-11-27 07:30', 'vendredi 07:30 (trop tôt)', false],
+    ['2026-11-26 23:00', 'jeudi 23:00 (trop tard)', false],
+  ])('%s (%s) → envoi : %s', async (depart, _description, envoi) => {
+    const env = await preparer(depart);
+    await env.planificateur.tick();
+    expect(env.messagerie.envoyes.length > 0).toBe(envoi);
+  });
+});
+
+describe('envoi interrompu', () => {
+  test('inscription avec le marqueur « envoi-en-cours » : pas de renvoi, avertissement', async () => {
+    const env = await preparer();
+    await env.tableur.modifierLignes('Inscriptions', [{ numero: 2, valeurs: { 'Demande ID': 'envoi-en-cours' } }]);
+    await env.planificateur.tick();
+    expect(env.messagerie.envoyes.map((m) => m.destinataire)).toEqual([ALICE]);
+    expect(logsDeNiveau(env, 'AVERTISSEMENT')[0]).toContain('Demande de confirmation à Durand Bob (ligne 2 d\'Inscriptions) peut-être interrompue');
+  });
+});
+
+describe('réponses en privé', () => {
+  /** Demandes envoyées le jeudi ; on vide les envois pour ne voir que la suite. */
+  async function apresDemandes(): Promise<EnvironnementDeTest> {
+    const env = await preparer();
+    await env.planificateur.tick();
+    env.messagerie.envoyes.length = 0;
+    env.horloge.avancer({ minutes: 10 });
+    return env;
+  }
+
+  test('OUI → « Confirmé » et « C\'est noté, merci ! »', async () => {
+    const env = await apresDemandes();
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'Oui je serai là' }));
+    expect(statuts(env)[0]).toBe('Durand Bob : Confirmé');
+    expect(env.messagerie.envoyes).toEqual([expect.objectContaining({ destinataire: BOB, texte: "C'est noté, merci !" })]);
+  });
+
+  test('NON → « Désisté »', async () => {
+    const env = await apresDemandes();
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'non désolé' }));
+    expect(statuts(env)[0]).toBe('Durand Bob : Désisté');
+  });
+
+  test('changement d\'avis : NON puis OUI → « Confirmé » (tant que la liste n\'est pas publiée)', async () => {
+    const env = await apresDemandes();
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'non' }));
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'finalement oui !' }));
+    expect(statuts(env)[0]).toBe('Durand Bob : Confirmé');
+  });
+
+  test('après la publication de la liste : la réponse n\'est plus prise en compte ici', async () => {
+    const env = await apresDemandes();
+    await env.tableur.modifierLignes('Actions', [{ numero: 2, valeurs: { Statut: 'Liste publiée' } }]);
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'oui' }));
+    expect(statuts(env)[0]).toBe('Durand Bob : En attente');
+    expect(env.messagerie.envoyes).toEqual([]);
+  });
+
+  test('OUI de quelqu\'un qui n\'a aucune demande : ignoré', async () => {
+    const env = await apresDemandes();
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: '33699999999', texte: 'oui' }));
+    expect(env.messagerie.envoyes).toEqual([]);
+  });
+
+  describe('plusieurs demandes en attente pour la même personne', () => {
+    /** Bob est aussi inscrit à une Maraude le même week-end. */
+    async function bobADeuxDemandes(): Promise<EnvironnementDeTest & { demandeBp: string; demandeMaraude: string }> {
+      const env = await preparer();
+      await ajouterAction(env, {
+        ID: 'A-0002', Type: 'Maraude', Date: '28/11/2026', Heure: '19:00', Lieu: 'Gare', Statut: 'Annoncée', 'Message ID': 'annonce-m',
+      });
+      await ajouterLignesDeTest(env.tableur, 'Inscriptions', [{
+        ID: 'I-00003', 'Action ID': 'A-0002', Type: 'Maraude', Date: '2026-11-28', Heure: '19:00', Téléphone: '06 12 34 56 78', Nom: 'Durand Bob', Statut: 'Inscrit',
+      }]);
+      await env.planificateur.tick();
+      const [demandeBp, demandeMaraude] = env.messagerie.envoyesA(BOB).map((m) => m.id);
+      env.messagerie.envoyes.length = 0;
+      return { ...env, demandeBp, demandeMaraude };
+    }
+
+    test('OUI sans citer : le bot ne devine pas, il demande de citer le bon message', async () => {
+      const env = await bobADeuxDemandes();
+      await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'oui' }));
+      expect(env.messagerie.dernierEnvoi().texte).toContain('réponds en citant le message concerné');
+      expect(statuts(env).filter((s) => s.startsWith('Durand Bob'))).toEqual(['Durand Bob : En attente', 'Durand Bob : En attente']);
+    });
+
+    test('OUI en citant la demande de la Maraude : seule la Maraude est confirmée', async () => {
+      const env = await bobADeuxDemandes();
+      await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'oui', cite: env.demandeMaraude }));
+      const lignes = env.tableur.lignes('Inscriptions').filter((l) => l.Nom === 'Durand Bob');
+      expect(lignes.map((l) => `${l.Type} : ${l.Statut}`)).toEqual(['BP : En attente', 'Maraude : Confirmé']);
+    });
+
+    test('une demande déjà répondue, une en attente : un OUI sans citer va à celle en attente', async () => {
+      const env = await bobADeuxDemandes();
+      await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'oui', cite: env.demandeBp }));
+      await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'non' }));
+      const lignes = env.tableur.lignes('Inscriptions').filter((l) => l.Nom === 'Durand Bob');
+      expect(lignes.map((l) => `${l.Type} : ${l.Statut}`)).toEqual(['BP : Confirmé', 'Maraude : Désisté']);
+    });
+  });
+});
+
+describe('OUI tardif dans le groupe (après l\'envoi des confirmations)', () => {
+  test('nouvel inscrit : sa demande de confirmation part tout de suite', async () => {
+    const env = await preparer();
+    await env.planificateur.tick(); // jeudi 10:00 : demandes envoyées
+    env.horloge.avancer({ heures: 2 });
+
+    const CHLOE = '33655555555';
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: CHLOE, nom: 'Chloé', texte: 'oui', groupe: GROUPE_TEST, cite: ANNONCE_BP }));
+
+    const recus = env.messagerie.envoyesA(CHLOE).map((m) => m.texte);
+    expect(recus[0]).toContain('Tu confirmes ta présence ?');
+    expect(recus[1]).toContain('peux-tu me donner ton prénom et ton nom'); // nouvelle : on demande aussi son nom
+    expect(env.tableur.lignes('Inscriptions').find((l) => l.Téléphone === '06 55 55 55 55')?.Statut).toBe('En attente');
+  });
+
+  test('Désisté qui redit OUI dans le groupe : réinscrit, nouvelle demande envoyée', async () => {
+    const env = await preparer();
+    await env.planificateur.tick();
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'non' })); // Désisté en privé
+    env.messagerie.envoyes.length = 0;
+
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, nom: 'Bob', texte: 'je peux finalement, oui', groupe: GROUPE_TEST, cite: ANNONCE_BP }));
+    // « je peux finalement, oui » : contient « oui » et pas de NON → OUI
+    expect(env.messagerie.envoyesA(BOB)[0].texte).toBe(DEMANDE_BOB);
+    expect(statuts(env)[0]).toBe('Durand Bob : En attente');
+  });
+});

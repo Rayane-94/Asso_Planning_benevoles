@@ -7,10 +7,12 @@
  *
  * Messages traités (CLAUDE.md §4.3) :
  *   - dans le groupe, une réponse OUI / NON qui CITE une annonce → inscription ;
+ *   - en privé, OUI / NON à une demande de confirmation → voir confirmations.ts ;
  *   - en privé, la réponse à la demande « prénom et nom » → fiche du bénévole.
- * (Les réponses OUI / NON en privé aux demandes de confirmation : étape 8.)
  */
-import { MESSAGES, REPONSE, STATUT_ACTION, STATUT_INSCRIPTION, type StatutInscription } from '../constantes.ts';
+import {
+  MESSAGES, PAUSE_ENTRE_MESSAGES_MS, REPONSE, STATUT_ACTION, STATUT_INSCRIPTION, type StatutInscription,
+} from '../constantes.ts';
 import type { MessageRecu } from '../ports/messagerie.ts';
 import { lireActions, type Action } from '../sheets/actions.ts';
 import {
@@ -20,6 +22,8 @@ import { ajouterInscription, lireInscriptions, modifierInscriptions, type Inscri
 import { dateLongue, horodatage } from '../utils/dates.ts';
 import { formaterTelephone } from '../utils/telephones.ts';
 import { detecterReponse, lireNomComplet, remplirModele } from '../utils/textes.ts';
+import { lireParametres } from '../sheets/parametres.ts';
+import { demanderConfirmationMaintenant, traiterReponseConfirmation } from './confirmations.ts';
 import type { Contexte } from './contexte.ts';
 
 /** Statuts d'une inscription « active » (la personne compte venir). */
@@ -91,9 +95,15 @@ async function inscrire(ctx: Contexte, action: Action, telephone: string, nomWha
 
   if (existante && STATUTS_ACTIFS.includes(existante.statut)) {
     ctx.logger.debug(`${description} : déjà inscrit(e), rien à faire`);
-  } else if (existante) {
+    await demanderLeNomSiBesoin(ctx, benevole);
+    return;
+  }
+  if (existante) {
     // Avait dit NON (ou s'était désisté) et redit OUI : on réactive la même ligne.
-    await modifierInscriptions(ctx.tableur, [{ inscription: existante, changements: { statut: STATUT_INSCRIPTION.INSCRIT, nom } }], maintenant);
+    // L'ancienne demande de confirmation est effacée : une nouvelle sera envoyée si besoin.
+    await modifierInscriptions(ctx.tableur, [{
+      inscription: existante, changements: { statut: STATUT_INSCRIPTION.INSCRIT, nom, demandeId: '' },
+    }], maintenant);
     ctx.logger.info(`Réinscription : ${description}`);
   } else {
     await ajouterInscription(ctx.tableur, {
@@ -102,7 +112,17 @@ async function inscrire(ctx: Contexte, action: Action, telephone: string, nomWha
     }, inscriptions, maintenant);
     ctx.logger.info(`Inscription : ${description}`);
   }
-  // Étape 8 : si les confirmations de cette action sont déjà parties, envoyer tout de suite la demande.
+
+  // Inscrit APRÈS l'envoi des demandes de confirmation : on lui envoie la sienne tout de suite (§4.3).
+  if (action.statut === STATUT_ACTION.CONFIRMATIONS_ENVOYEES) {
+    const { parametres } = await lireParametres(ctx.tableur);
+    const inscription = (await lireInscriptions(ctx.tableur)).inscriptions
+      .find((i) => i.actionId === action.id && i.telephone === telephone);
+    if (inscription) {
+      await demanderConfirmationMaintenant(ctx, action, inscription, benevole, parametres);
+      await ctx.horloge.attendre(PAUSE_ENTRE_MESSAGES_MS); // avant l'éventuelle demande de nom
+    }
+  }
 
   await demanderLeNomSiBesoin(ctx, benevole);
 }
@@ -154,10 +174,14 @@ async function demanderLeNomSiBesoin(ctx: Contexte, benevole: Benevole): Promise
 async function traiterMessagePrive(ctx: Contexte, message: MessageRecu): Promise<void> {
   if (message.telephone === null) return;
 
-  // Étape 8 : OUI / NON en réponse à une demande de confirmation.
+  // OUI / NON : réponse à une demande de confirmation (et jamais un nom).
+  const reponse = detecterReponse(message.texte);
+  if (reponse !== null) {
+    await traiterReponseConfirmation(ctx, message, reponse);
+    return;
+  }
 
-  // Réponse à la demande de nom ?
-  if (detecterReponse(message.texte) !== null) return; // un OUI / NON n'est pas un nom
+  // Sinon : peut-être la réponse à la demande de nom ?
   const { parTelephone } = await lireBenevoles(ctx.tableur);
   const benevole = parTelephone.get(message.telephone);
   const attenduUnNom = benevole && benevole.nomDemandeLe !== '' && benevole.prenom === '' && benevole.nom === '';
