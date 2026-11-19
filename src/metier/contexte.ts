@@ -5,6 +5,7 @@
  * Google ou l'heure. En production, index.ts y met les vrais services ; dans les tests,
  * on y met les faux (tests/faux/contexteDeTest.ts).
  */
+import type { EtatLocal } from '../etat/etatLocal.ts';
 import type { MemoireMessages } from '../etat/memoireMessages.ts';
 import type { Horloge } from '../ports/horloge.ts';
 import type { FileExclusive } from '../utils/fileExclusive.ts';
@@ -25,6 +26,8 @@ export interface Contexte {
   file: FileExclusive;
   /** Messages déjà traités (anti-doublon). */
   memoireMessages: MemoireMessages;
+  /** Petite mémoire persistante (ex. « récap de la semaine déjà envoyé »). */
+  etat: EtatLocal;
 }
 
 /** Ce que le tick lit une fois dans le Sheet et partage entre toutes les tâches (économise le quota). */

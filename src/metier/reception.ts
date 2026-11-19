@@ -25,6 +25,7 @@ import { detecterReponse, lireNomComplet, remplirModele } from '../utils/textes.
 import { lireParametres } from '../sheets/parametres.ts';
 import { demanderConfirmationMaintenant, traiterReponseConfirmation } from './confirmations.ts';
 import type { Contexte } from './contexte.ts';
+import { traiterDesistementTardif } from './desistement.ts';
 
 /** Statuts d'une inscription « active » (la personne compte venir). */
 const STATUTS_ACTIFS: StatutInscription[] = [STATUT_INSCRIPTION.INSCRIT, STATUT_INSCRIPTION.EN_ATTENTE, STATUT_INSCRIPTION.CONFIRME];
@@ -177,7 +178,9 @@ async function traiterMessagePrive(ctx: Contexte, message: MessageRecu): Promise
   // OUI / NON : réponse à une demande de confirmation (et jamais un nom).
   const reponse = detecterReponse(message.texte);
   if (reponse !== null) {
-    await traiterReponseConfirmation(ctx, message, reponse);
+    const traite = await traiterReponseConfirmation(ctx, message, reponse);
+    // Pas de demande ouverte : peut-être un NON après la publication de la liste (§4.6)
+    if (!traite && reponse === REPONSE.NON) await traiterDesistementTardif(ctx, message);
     return;
   }
 

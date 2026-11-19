@@ -7,6 +7,7 @@
  *   await env.planificateur.tick();
  *   env.messagerie.dernierEnvoi().texte; // → '📣 BP – samedi 28/11 à 14:00 – Entrepôt…'
  */
+import { creerEtatEnMemoire } from '../../src/etat/etatLocal.ts';
 import { creerMemoireMessages } from '../../src/etat/memoireMessages.ts';
 import type { Contexte } from '../../src/metier/contexte.ts';
 import { creerFileExclusive } from '../../src/utils/fileExclusive.ts';
@@ -38,7 +39,7 @@ export async function contexteDeTest(depart = '2026-11-21 18:00'): Promise<Envir
 
   const ctx: Contexte = {
     tableur, messagerie, horloge, logger, groupeId: GROUPE_TEST,
-    file: creerFileExclusive(), memoireMessages: creerMemoireMessages(),
+    file: creerFileExclusive(), memoireMessages: creerMemoireMessages(), etat: creerEtatEnMemoire(),
   };
   return { ctx, tableur, messagerie, horloge, planificateur: creerPlanificateur(ctx), logs };
 }

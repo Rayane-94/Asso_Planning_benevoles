@@ -86,7 +86,12 @@ export function ecartJours(cleA: CleDate, cleB: CleDate): number {
 
 /** Nom du jour. ex. jourSemaine('2026-11-28') → 'samedi' */
 export function jourSemaine(cle: CleDate): string {
-  return JOURS_SEMAINE[dateUtcDepuisCle(cle).getUTCDay()];
+  return JOURS_SEMAINE[numeroJourSemaine(cle)];
+}
+
+/** Numéro du jour : 0 = dimanche, 1 = lundi … 6 = samedi. ex. '2026-11-27' → 5 (vendredi) */
+export function numeroJourSemaine(cle: CleDate): number {
+  return dateUtcDepuisCle(cle).getUTCDay();
 }
 
 /** Format court, pour la liste finale. ex. '2026-11-28' → '28/11' */

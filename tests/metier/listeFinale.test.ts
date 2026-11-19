@@ -120,11 +120,13 @@ describe('le bon moment', () => {
     const { lignes } = await env.tableur.lireOnglet('Paramètres');
     const ligne = lignes.find((l) => l.valeurs.Paramètre === 'HEURE_LISTE');
     await env.tableur.modifierLignes('Paramètres', [{ numero: ligne?.numero ?? 0, valeurs: { Valeur: '21:00' } }]);
+    // À 21:00 le récap du vendredi (20:30) part aussi : on ne compte que la liste.
+    const listes = () => env.messagerie.envoyesA(GROUPE_TEST).filter((m) => m.texte.startsWith('BP – 28/11'));
     await env.planificateur.tick();
-    expect(env.messagerie.envoyesA(GROUPE_TEST)).toEqual([]);
+    expect(listes()).toEqual([]);
     env.horloge.regler('2026-11-27 21:00');
     await env.planificateur.tick();
-    expect(env.messagerie.envoyesA(GROUPE_TEST)).toHaveLength(1);
+    expect(listes()).toHaveLength(1);
   });
 });
 

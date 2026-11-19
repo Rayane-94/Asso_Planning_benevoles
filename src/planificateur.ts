@@ -17,6 +17,7 @@ import type { Contexte, DonneesDuTick } from './metier/contexte.ts';
 import { publierAnnonces } from './metier/annonces.ts';
 import { envoyerConfirmations } from './metier/confirmations.ts';
 import { publierListes } from './metier/listeFinale.ts';
+import { envoyerRecap } from './metier/recap.ts';
 import { attribuerIdsActions, lireActions } from './sheets/actions.ts';
 import { lireParametres } from './sheets/parametres.ts';
 
@@ -64,7 +65,8 @@ export function creerPlanificateur(ctx: Contexte, journal?: Enregistrable): Plan
           await tache('Annonces', () => publierAnnonces(ctx, donnees, 'automatique'));
           await tache('Confirmations', () => envoyerConfirmations(ctx, donnees, 'automatique'));
           await tache('Liste finale', () => publierListes(ctx, donnees, 'automatique'));
-          // Étape 10 : récap du vendredi, commandes, alerte WhatsApp…
+          await tache('Récap', () => envoyerRecap(ctx, donnees, 'automatique'));
+          // Étape 10b : commandes manuelles, alerte WhatsApp déconnecté
         }
       });
     } finally {

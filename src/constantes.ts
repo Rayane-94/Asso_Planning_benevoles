@@ -73,6 +73,8 @@ export const MESSAGES = {
   ACCUSE_RECEPTION: "C'est noté, merci !",
   /** La personne a plusieurs demandes en attente et n'a pas cité laquelle. */
   CITER_LE_MESSAGE: 'Tu as plusieurs actions en attente, réponds en citant le message concerné (appui long → Répondre).',
+  /** Au référent, quand un confirmé se désiste après la publication de la liste. */
+  ALERTE_DESISTEMENT: '⚠️ Désistement de dernière minute : {nom} ({telephone}) ne viendra pas à {type} – {date} à {heure} – {lieu}.',
 } as const;
 
 /** Commandes manuelles de l'onglet Commandes (remplacent le menu Apps Script, voir CLAUDE.md §5). */
