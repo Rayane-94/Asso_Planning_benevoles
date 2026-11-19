@@ -1,0 +1,41 @@
+# docker-compose.yml — Lance WAHA (l'API WhatsApp) dans un conteneur Docker.
+#
+#   docker compose up -d      → démarre (en arrière-plan)
+#   docker compose logs -f    → affiche ce qui se passe (Ctrl+C pour quitter l'affichage)
+#   docker compose down       → arrête
+#
+# Les valeurs ${…} viennent du fichier .env (à la racine du projet).
+# Le même fichier servira sur le VPS Oracle (bloc 5), avec en plus le conteneur du bot.
+
+services:
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: waha
+    restart: unless-stopped # redémarre tout seul après une panne ou un redémarrage du PC / serveur
+    ports:
+      # Sur le PC : WAHA est joignable à http://localhost:3001 (le port 3000 est pris par le bot).
+      # « 127.0.0.1 » = accessible UNIQUEMENT depuis cette machine, jamais depuis Internet.
+      - "127.0.0.1:3001:3000"
+    environment:
+      # Clé partagée avec le bot (même valeur que WAHA_API_KEY dans .env)
+      WAHA_API_KEY: ${WAHA_API_KEY:?Remplir WAHA_API_KEY dans le .env}
+      # Tableau de bord (scan du QR code) : http://localhost:3001/dashboard
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD:?Remplir WAHA_DASHBOARD_PASSWORD dans le .env}
+      # Moteur sans navigateur Chrome : léger, et disponible aussi sur les machines ARM d'Oracle
+      WHATSAPP_DEFAULT_ENGINE: GOWS
+      # La session « default » démarre toute seule et redémarre après une coupure
+      WHATSAPP_START_SESSION: default
+      WHATSAPP_RESTART_ALL_SESSIONS: "True"
+      # Où WAHA envoie les messages reçus (webhook). « host.docker.internal » = « le PC lui-même »
+      # vu depuis le conteneur : c'est là que tourne le bot (ou le script de spike) sur le port 3000.
+      WHATSAPP_HOOK_URL: ${WAHA_WEBHOOK_URL:-http://host.docker.internal:3000/webhook/waha}
+      # message.any = tous les messages, y compris ceux envoyés par le bot (utile pour le spike) ;
+      # session.status = connexion / déconnexion de WhatsApp.
+      WHATSAPP_HOOK_EVENTS: message.any,session.status
+    volumes:
+      # La session WhatsApp est gardée ici : sans ça, il faudrait rescanner le QR code à chaque redémarrage.
+      - ./data/waha-sessions:/app/.sessions
+    extra_hosts:
+      # Nécessaire sous Linux (VPS) pour que « host.docker.internal » fonctionne ; sans effet sous Windows/Mac.
+      - "host.docker.internal:host-gateway"

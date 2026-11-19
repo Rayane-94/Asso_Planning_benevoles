@@ -115,13 +115,12 @@ describe('NON, et changements d\'avis', () => {
 describe('messages ignorés', () => {
   test.each([
     ['« peut-être »', { texte: 'peut-être' }],
-    ['sans citation', { texte: 'oui', cite: undefined }],
+    // (« oui » sans citation : désormais accepté sous conditions, voir « OUI sans citation » plus bas)
     ["citant un message qui n'est pas une annonce", { texte: 'oui', cite: 'autre-message' }],
     ['dans un autre groupe', { texte: 'oui', groupe: 'autre-groupe' }],
   ])('%s', async (_cas, variante) => {
     const env = await apresAnnonce();
     const message = env.messagerie.recu({ de: BOB, nom: 'Bob', groupe: GROUPE_TEST, cite: env.annonce, ...variante });
-    if ('cite' in variante && variante.cite === undefined) message.citeId = null;
     await recevoirMessage(env.ctx, message);
     expect(inscriptions(env)).toEqual([]);
     expect(env.messagerie.envoyes).toEqual([]);
