@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
-  ajouterJours, cleDate, dateCourte, dateLongue, ecartJours, heureDe,
-  instantDeParis, jourSemaine, parseDateFr, parseHeure,
+  ajouterJours, cleDate, dateCourte, dateLongue, ecartJours, heureDe, horodatage,
+  instantDeParis, jourSemaine, lireDate, parseDateFr, parseHeure,
 } from '../../src/utils/dates.ts';
 
 describe('cleDate et heureDe : toujours vus depuis Paris', () => {
@@ -71,6 +71,26 @@ describe('parseDateFr', () => {
 
   test.each(['31/02/2026', '2026-11-28', 'demain', ''])('« %s » → null (invalide)', (texte) => {
     expect(parseDateFr(texte)).toBeNull();
+  });
+});
+
+describe('lireDate : les deux formats du Sheet', () => {
+  test.each([
+    ['28/11/2026', '2026-11-28'], // tapée par l'équipe
+    ['2026-11-28', '2026-11-28'], // écrite par le bot
+    [' 2026-11-28 ', '2026-11-28'],
+  ])('« %s » → %s', (texte, attendu) => {
+    expect(lireDate(texte)).toBe(attendu);
+  });
+
+  test.each(['2026-02-31', '', '28-11', '2026/11/28'])('« %s » → null', (texte) => {
+    expect(lireDate(texte)).toBeNull();
+  });
+});
+
+describe('horodatage', () => {
+  test("date et heure de Paris, à la seconde", () => {
+    expect(horodatage(new Date('2026-11-21T17:00:05Z'))).toBe('2026-11-21 18:00:05');
   });
 });
 

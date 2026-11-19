@@ -118,6 +118,28 @@ export function parseDateFr(texte: string): CleDate | null {
 }
 
 /**
+ * Lit une date venant du Sheet, dans l'un des deux formats du projet :
+ *   - '28/11/2026' : tapée par l'équipe (colonne Date d'Actions) ;
+ *   - '2026-11-28' : écrite par le bot (Inscriptions, Bénévoles…).
+ * @return la clé 'yyyy-MM-dd', ou null si la date est vide ou invalide
+ */
+export function lireDate(texte: string): CleDate | null {
+  const propre = texte.trim();
+  const iso = propre.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return parseDateFr(`${iso[3]}/${iso[2]}/${iso[1]}`); // réutilise la vérification (refuse le 31/02)
+  return parseDateFr(propre);
+}
+
+/**
+ * Horodatage lisible, heure de Paris, pour le Sheet (Journal, « Mis à jour »…).
+ * ex. → '2026-11-21 18:00:05'
+ */
+export function horodatage(date: Date): string {
+  const m = morceauxParis(date);
+  return `${m.year}-${m.month}-${m.day} ${m.hour}:${m.minute}:${m.second}`;
+}
+
+/**
  * Lit une heure tapée librement : '19:00', '19h', '19h30', '9H05', '19 h 30', '19:00:00', '19'.
  * @return l'heure au format 'HH:mm', ou null si invalide
  */
