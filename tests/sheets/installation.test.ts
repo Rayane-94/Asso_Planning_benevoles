@@ -45,6 +45,16 @@ describe('installerSheet sur un Sheet neuf', () => {
     expect(tableur.configuration(ONGLETS.COMMANDES).find((c) => c.nom === 'Lancer')?.format).toBe('case');
   });
 
+  test('marque en vert uniquement les colonnes à remplir par le responsable', async () => {
+    const tableur = new FauxTableur();
+    await installer(tableur);
+    const aRemplir = (onglet: string) => tableur.configuration(onglet).filter((c) => c.aRemplir).map((c) => c.nom);
+    expect(aRemplir(ONGLETS.ACTIONS)).toEqual(['Type', 'Date', 'Heure', 'Lieu', 'Places']);
+    expect(aRemplir(ONGLETS.PARAMETRES)).toEqual(['Valeur']);
+    expect(aRemplir(ONGLETS.COMMANDES)).toEqual(['Lancer']);
+    expect(aRemplir(ONGLETS.INSCRIPTIONS)).toEqual([]); // tout est rempli par le bot
+  });
+
   test('écrit les formules des vues Présents et Absents', async () => {
     const tableur = new FauxTableur();
     await installer(tableur);

@@ -158,6 +158,15 @@ export class GoogleSheets implements Tableur, AdministrationTableur {
       // Toute la colonne, sauf la ligne d'en-têtes
       const zone = { sheetId, startRowIndex: 1, startColumnIndex: index, endColumnIndex: index + 1 };
 
+      // Couleur de l'en-tête : vert = à remplir par le responsable, gris = rempli par le bot
+      requetes.push({
+        repeatCell: {
+          range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: index, endColumnIndex: index + 1 },
+          cell: { userEnteredFormat: { backgroundColor: colonne.aRemplir ? VERT_A_REMPLIR : GRIS_AUTOMATIQUE } },
+          fields: 'userEnteredFormat.backgroundColor',
+        },
+      });
+
       if (colonne.format !== 'case') {
         requetes.push({
           repeatCell: {
@@ -255,6 +264,10 @@ export class GoogleSheets implements Tableur, AdministrationTableur {
 }
 
 // ---------------------------------------------------------------------------
+
+/** Couleurs des en-têtes (format Google : rouge, vert, bleu entre 0 et 1). */
+const VERT_A_REMPLIR = { red: 0.714, green: 0.843, blue: 0.659 }; // vert #B6D7A8 (« vert clair 2 » de Google)
+const GRIS_AUTOMATIQUE = { red: 0.937, green: 0.937, blue: 0.937 }; // gris clair #EFEFEF
 
 /** 'Bénévoles' → "'Bénévoles'" : les noms d'onglets sont entourés d'apostrophes (et ' doublé). */
 function nomProtege(onglet: string): string {

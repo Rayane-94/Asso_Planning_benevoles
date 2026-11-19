@@ -83,6 +83,8 @@ export interface ConfigColonne {
   choix?: string[];
   /** Colonne technique cachée à l'équipe. */
   masquee?: boolean;
+  /** Colonne à remplir par le responsable : en-tête en vert (sinon gris = rempli par le bot). */
+  aRemplir?: boolean;
 }
 
 // ---------------------------------------------------------------------------

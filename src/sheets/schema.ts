@@ -49,6 +49,8 @@ export const COLONNES_JOURNAL = {
  *   - 'date'  : vraie date affichée jj/mm/aaaa (colonne remplie à la main par le référent) ;
  *   - 'case'  : case à cocher.
  * `choix` = liste déroulante. `masquee` = colonne technique cachée à l'équipe.
+ * `aRemplir` = colonne remplie par le responsable : en-tête VERT. Les autres en-têtes sont
+ * GRIS : le bot les remplit tout seul (on n'y touche que pour corriger).
  *
  * Les dates écrites PAR LE BOT (Inscriptions, Bénévoles, Journal) sont du texte au format
  * '2026-11-28' : ce format se trie correctement, même en texte (utile pour les vues).
@@ -79,8 +81,9 @@ export function definitionsOnglets(typesActions: string[]): DefinitionOnglet[] {
     {
       nom: ONGLETS.ACTIONS,
       colonnes: [
-        texte(A.ID), texte(A.TYPE, { choix: typesActions }), { nom: A.DATE, format: 'date' },
-        texte(A.HEURE), texte(A.LIEU), texte(A.PLACES), texte(A.STATUT, { choix: statutsAction }),
+        texte(A.ID), texte(A.TYPE, { choix: typesActions, aRemplir: true }), { nom: A.DATE, format: 'date', aRemplir: true },
+        texte(A.HEURE, { aRemplir: true }), texte(A.LIEU, { aRemplir: true }), texte(A.PLACES, { aRemplir: true }),
+        texte(A.STATUT, { choix: statutsAction }),
         texte(A.MESSAGE_ID, { masquee: true }),
       ],
     },
@@ -96,10 +99,13 @@ export function definitionsOnglets(typesActions: string[]): DefinitionOnglet[] {
         texte(I.DEMANDE_ID, { masquee: true }), texte(I.MIS_A_JOUR),
       ],
     },
-    { nom: ONGLETS.PARAMETRES, colonnes: [texte(P.PARAMETRE), texte(P.VALEUR), texte(P.DESCRIPTION)] },
+    { nom: ONGLETS.PARAMETRES, colonnes: [texte(P.PARAMETRE), texte(P.VALEUR, { aRemplir: true }), texte(P.DESCRIPTION)] },
     {
       nom: ONGLETS.COMMANDES,
-      colonnes: [texte(C.COMMANDE), { nom: C.LANCER, format: 'case' }, texte(C.DERNIERE_EXECUTION), texte(C.RESULTAT)],
+      colonnes: [
+        texte(C.COMMANDE), { nom: C.LANCER, format: 'case', aRemplir: true },
+        texte(C.DERNIERE_EXECUTION), texte(C.RESULTAT),
+      ],
     },
     { nom: ONGLETS.JOURNAL, colonnes: [texte(J.DATE), texte(J.NIVEAU), texte(J.MESSAGE)] },
   ];
