@@ -54,7 +54,8 @@ export interface Tableur {
  */
 export interface AdministrationTableur {
   listerOnglets(): Promise<string[]>;
-  creerOnglet(nom: string): Promise<void>;
+  /** @param position 0 = premier onglet ; absent = à la fin */
+  creerOnglet(nom: string, position?: number): Promise<void>;
   /** En-têtes de la ligne 1 (tableau vide si l'onglet est vide). */
   lireEntetes(onglet: string): Promise<string[]>;
   /** Remplace toute la ligne 1 par ces en-têtes. */

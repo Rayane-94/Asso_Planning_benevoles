@@ -1,0 +1,117 @@
+/**
+ * metier/annonces.ts — Publication des annonces dans le groupe (CLAUDE.md §4.2).
+ *
+ * Une annonce par action (jamais regroupées : chaque réponse doit pouvoir citer
+ * SA propre annonce). Après l'envoi, l'action passe à « Annoncée » et l'ID du message
+ * est enregistré : c'est lui qui permettra de rattacher les « OUI » à la bonne action.
+ *
+ * Quelles actions annoncer ? (J = aujourd'hui, réglages par défaut)
+ *   - automatique (à partir de HEURE_ANNONCE, jusqu'à 22:00) : date entre J+3 et J+7
+ *       · J+7 = cas normal ; J+3 à J+6 = « rattrapage » d'une action ajoutée tard ;
+ *       · J+3 = JOURS_AVANT_CONFIRMATION + 1 : l'annonce part au moins la veille
+ *         de la demande de confirmation ;
+ *   - commande « Annoncer maintenant » : date entre aujourd'hui et J+7, à toute heure.
+ */
+import { HEURE_FIN_ENVOIS_AUTO, MARQUEUR_ENVOI_EN_COURS, PAUSE_ENTRE_MESSAGES_MS, STATUT_ACTION } from '../constantes.ts';
+import { modifierAction, type Action } from '../sheets/actions.ts';
+import type { Parametres } from '../sheets/parametres.ts';
+import { cleDate, dateLongue, ecartJours, heureDe } from '../utils/dates.ts';
+import { remplirModele } from '../utils/textes.ts';
+import type { Contexte, DonneesDuTick } from './contexte.ts';
+
+export type ModeAnnonce = 'automatique' | 'commande';
+
+/**
+ * Publie les annonces dues.
+ * @return le nombre d'annonces publiées
+ */
+export async function publierAnnonces(ctx: Contexte, donnees: DonneesDuTick, mode: ModeAnnonce): Promise<number> {
+  const { parametres, actions } = donnees;
+  const maintenant = ctx.horloge.maintenant();
+
+  if (mode === 'automatique' && !estDansLaFenetre(heureDe(maintenant), parametres.heureAnnonce, HEURE_FIN_ENVOIS_AUTO)) {
+    return 0; // pas encore l'heure, ou trop tard ce soir
+  }
+  if (ctx.groupeId === null) {
+    ctx.logger.avertissement('Annonces impossibles : le groupe WhatsApp n\'est pas configuré (GROUPE_ID dans le .env)');
+    return 0;
+  }
+
+  signalerEnvoisInterrompus(ctx, actions);
+  const aAnnoncer = actionsAAnnoncer(actions, cleDate(maintenant), parametres, mode);
+  let publiees = 0;
+
+  for (const action of aAnnoncer) {
+    if (publiees > 0) await ctx.horloge.attendre(PAUSE_ENTRE_MESSAGES_MS);
+    if (await publierUneAnnonce(ctx, ctx.groupeId, action, parametres)) publiees++;
+  }
+  return publiees;
+}
+
+/**
+ * Les actions à annoncer maintenant, triées par date puis heure.
+ * Exportée pour être testée seule.
+ */
+export function actionsAAnnoncer(actions: Action[], aujourdhui: string, parametres: Parametres, mode: ModeAnnonce): Action[] {
+  const ecartMinimum = mode === 'automatique' ? parametres.joursAvantConfirmation + 1 : 0;
+  return actions
+    .filter((action) => action.statut === STATUT_ACTION.A_ANNONCER && action.messageId === '')
+    .filter((action) => {
+      const ecart = ecartJours(aujourdhui, action.date);
+      return ecart >= ecartMinimum && ecart <= parametres.joursAvantAnnonce;
+    })
+    .sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+}
+
+/**
+ * Envoie l'annonce d'une action et enregistre le résultat.
+ * @return true si l'annonce est partie
+ */
+async function publierUneAnnonce(ctx: Contexte, groupeId: string, action: Action, parametres: Parametres): Promise<boolean> {
+  const texte = remplirModele(parametres.textes.annonce, {
+    type: action.type,
+    date: dateLongue(action.date),
+    heure: action.heure,
+    lieu: action.lieu,
+  });
+  const description = `${action.type} du ${dateLongue(action.date)} (${action.id})`;
+
+  // 1) Marqueur AVANT l'envoi : si on plante après l'envoi, on ne renverra pas en double.
+  await modifierAction(ctx.tableur, action, { messageId: MARQUEUR_ENVOI_EN_COURS });
+
+  // 2) Envoi
+  let messageId: string;
+  try {
+    messageId = await ctx.messagerie.envoyerTexte(groupeId, texte);
+  } catch (erreur) {
+    // L'envoi a échoué pour de bon : on retire le marqueur pour réessayer au prochain tick.
+    await modifierAction(ctx.tableur, action, { messageId: '' });
+    ctx.logger.erreur(`Annonce non envoyée : ${description}`, erreur);
+    return false;
+  }
+
+  // 3) Enregistrement du résultat
+  await modifierAction(ctx.tableur, action, { statut: STATUT_ACTION.ANNONCEE, messageId });
+  ctx.logger.info(`Annonce publiée : ${description}`);
+  return true;
+}
+
+/**
+ * Une action avec le marqueur « envoi-en-cours » mais pas « Annoncée » : le bot s'est
+ * arrêté pendant l'envoi. On ne sait pas si l'annonce est partie : un humain doit vérifier.
+ */
+function signalerEnvoisInterrompus(ctx: Contexte, actions: Action[]): void {
+  for (const action of actions) {
+    if (action.statut === STATUT_ACTION.A_ANNONCER && action.messageId === MARQUEUR_ENVOI_EN_COURS) {
+      ctx.logger.avertissement(
+        `Annonce de ${action.type} du ${dateLongue(action.date)} (ligne ${action.numero}) peut-être interrompue : ` +
+        'vérifier dans le groupe WhatsApp. Si elle n\'est pas partie, vider la cellule « Message ID » (colonne masquée) pour la renvoyer.',
+      );
+    }
+  }
+}
+
+/** '18:30' est-il dans [debut, fin[ ? (les heures 'HH:mm' se comparent comme du texte) */
+export function estDansLaFenetre(heure: string, debut: string, fin: string): boolean {
+  return heure >= debut && heure < fin;
+}

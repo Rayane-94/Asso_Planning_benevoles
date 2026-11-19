@@ -39,6 +39,17 @@ export const COLONNES_JOURNAL = {
   DATE: 'Date', NIVEAU: 'Niveau', MESSAGE: 'Message',
 } as const;
 
+export const COLONNES_ETAT = {
+  ELEMENT: 'Élément', ETAT: 'État', DEPUIS: 'Depuis', QUE_FAIRE: 'Que faire',
+} as const;
+
+/** Lignes du tableau de bord « État du bot » (colonne Élément). */
+export const ELEMENTS_ETAT = {
+  WHATSAPP: 'WhatsApp',
+  BOT: 'Bot',
+  DERNIER_PASSAGE: 'Dernier passage',
+} as const;
+
 // ---------------------------------------------------------------------------
 // Description complète des onglets « de données » (remplis par le bot ou l'équipe)
 // ---------------------------------------------------------------------------
@@ -76,8 +87,13 @@ export function definitionsOnglets(typesActions: string[]): DefinitionOnglet[] {
   const P = COLONNES_PARAMETRES;
   const C = COLONNES_COMMANDES;
   const J = COLONNES_JOURNAL;
+  const E = COLONNES_ETAT;
 
   return [
+    {
+      nom: ONGLETS.ETAT,
+      colonnes: [texte(E.ELEMENT), texte(E.ETAT), texte(E.DEPUIS), texte(E.QUE_FAIRE)],
+    },
     {
       nom: ONGLETS.ACTIONS,
       colonnes: [

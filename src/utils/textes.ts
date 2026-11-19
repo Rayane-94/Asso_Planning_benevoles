@@ -57,6 +57,35 @@ export function detecterReponse(texte: string | null | undefined): Reponse | nul
   return null;
 }
 
+/**
+ * Essaie de lire « prénom nom » dans un message privé (réponse à la demande de nom).
+ * Prudent : on refuse tout ce qui ne ressemble pas clairement à un nom (question,
+ * chiffres, phrase longue…) ; un humain s'en occupera.
+ *
+ *   'bob durand'          → { prenom: 'Bob', nom: 'Durand' }
+ *   'Jean-Pierre De La Tour' → { prenom: 'Jean-Pierre', nom: 'De La Tour' }
+ *   'Alice'               → { prenom: 'Alice', nom: '' }
+ *   "c'est à quelle heure ?" → null
+ */
+export function lireNomComplet(texte: string): { prenom: string; nom: string } | null {
+  const propre = texte.trim().replace(/\s+/g, ' ');
+  if (propre === '' || propre.length > 50) return null;
+  // Uniquement des lettres (avec accents), espaces, tirets et apostrophes (' ou ’, celle des iPhone)
+  if (!/^\p{L}[\p{L}'’ \-]*$/u.test(propre)) return null;
+  const mots = propre.split(' ');
+  if (mots.length > 4) return null; // plus proche d'une phrase que d'un nom
+  const [prenom, ...reste] = mots.map(majusculeInitiale);
+  return { prenom, nom: reste.join(' ') };
+}
+
+/** 'bob' → 'Bob', 'DURAND' → 'Durand', mais 'McDonald' reste 'McDonald' (déjà en casse mixte). */
+function majusculeInitiale(mot: string): string {
+  const casseMixte = mot !== mot.toLowerCase() && mot !== mot.toUpperCase();
+  if (casseMixte) return mot;
+  // Gère aussi les prénoms composés : 'jean-pierre' → 'Jean-Pierre'
+  return mot.toLowerCase().replace(/(^|[-'’])(\p{L})/gu, (_, separateur: string, lettre: string) => separateur + lettre.toUpperCase());
+}
+
 // ---------------------------------------------------------------------------
 // Fonctions internes à ce fichier
 // ---------------------------------------------------------------------------

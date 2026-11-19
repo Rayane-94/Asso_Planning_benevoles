@@ -75,9 +75,13 @@ export class FauxTableur implements Tableur, AdministrationTableur {
     return [...this.onglets.keys()];
   }
 
-  async creerOnglet(nom: string): Promise<void> {
+  async creerOnglet(nom: string, position?: number): Promise<void> {
     if (this.onglets.has(nom)) throw new Error(`Une feuille nommée « ${nom} » existe déjà.`);
-    this.onglets.set(nom, ongletVide());
+    // Une Map garde l'ordre d'ajout : pour insérer à une position, on la reconstruit.
+    const liste = [...this.onglets.entries()];
+    liste.splice(position ?? liste.length, 0, [nom, ongletVide()]);
+    this.onglets.clear();
+    for (const [cle, onglet] of liste) this.onglets.set(cle, onglet);
   }
 
   async lireEntetes(nom: string): Promise<string[]> {

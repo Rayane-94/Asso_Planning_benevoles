@@ -41,6 +41,8 @@ L'accueil des nouveaux bénévoles : message automatique, transcription et résu
 - **Changer de fournisseur WhatsApp doit rester facile** (interface `Messagerie`, voir §3.3) : si WAHA casse, on peut brancher Evolution API ou un fournisseur hébergé payant (Green-API…) sans toucher au code métier.
 - Format de la liste finale **volontairement minimaliste** (voir §4.5).
 - Les réglages courants (heures, textes) se font **dans le Sheet** (onglet Paramètres), jamais dans le code.
+- **Philosophie (validée le 19/11/2026)** : le bot automatise le cas normal ; les cas particuliers (changement de dernière minute, situation imprévue) sont gérés **à la main** par l'équipe et les bénévoles. Le bot ne devine jamais : en cas de doute, il ne fait rien et note dans le Journal.
+- **Tests réels** : Rayane testera d'abord avec **son numéro WhatsApp personnel** (risque de bannissement connu et accepté), avec un groupe de test séparé et un second testeur pour les réponses (les messages envoyés depuis le numéro du bot sont vus comme venant du bot). Le numéro dédié de l'asso viendra ensuite.
 - **Décisions écartées** (18/11/2026) :
   - Apps Script + fournisseur hébergé payant (v2) → remplacé par le VPS (gratuit, temps réel, prêt pour la phase 2).
   - Apps Script + WAHA sur le VPS → il aurait fallu exposer WAHA sur Internet et gérer la réception des messages entre Google et le VPS ; plus simple de tout mettre sur le VPS.
@@ -243,6 +245,7 @@ Une réponse « NON » (ou « je peux plus ») reçue en privé après la public
 
 | Onglet | Colonnes | Rempli par |
 |---|---|---|
+| **État du bot** (1er onglet) | Élément, État, Depuis, Que faire — lignes WhatsApp (🟢/🔴), Bot (actif / en pause), Dernier passage (heure du dernier tick) | Le bot |
 | **Actions** | ID, Type, Date, Heure, Lieu, Places (facultatif), Statut, Message ID (masqué) | Le référent (le reste par le bot) |
 | **Bénévoles** | Téléphone (clé, E.164), Prénom, Nom, Nom WhatsApp, Nom demandé le, Inscrit le | Le bot. L'équipe peut corriger |
 | **Inscriptions** | ID, Action ID, Type, Date, Heure, Lieu, Téléphone, Nom, Statut, Demande ID (masqué), Mis à jour | Le bot. **C'est la source de vérité** |
@@ -324,9 +327,9 @@ Côté développeurs (terminal du VPS) :
 | Bloc | Branche | Étapes | Statut |
 |---|---|---|---|
 | 1 | `migration-vps-typescript` | 1, 2 | ✅ fusionné (PR #1) |
-| 2 | `donnees-sheet` | 3, 4 | en cours |
+| 2 | `donnees-sheet` | 3, 4 | ✅ fusionné (PR #2) |
 | 3 | `bloc-3-whatsapp` | 0, 5 (numéro de test nécessaire) | |
-| 4 | `bloc-4-fonctionnalites` | 6 à 11 | |
+| 4 | `bloc-4-fonctionnalites` | 6 à 11 | terminé (fait avant le bloc 3 : pas encore de numéro de test) — PR à fusionner |
 | 5 | `bloc-5-mise-en-production` | 12, 13 | |
 
 Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
@@ -346,14 +349,24 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
    - **4a — connexion et installation** : implémentation Google du `Tableur` (lecture des valeurs affichées, écriture RAW), schéma des onglets (`sheets/schema.ts`), `npm run installer-sheet` (idempotent), guide `docs/compte-service-google.md`.
    - **4b — modules par onglet** : Actions, Bénévoles, Inscriptions, Paramètres (lecture typée), Journal (écriture + 1000 lignes max), génération d'ID.
 5. **Adaptateur WAHA + serveur** : envoi, citation, groupes, vérification de connexion, conversion des webhooks en `MessageRecu`, gestion des LID, déduplication, état local ; serveur Express (`/webhook/waha`, `/sante`) ; script `lister-groupes`.
-6. **Planificateur et annonces J-7** (avec rattrapage).
-7. **Réception** : réponses citées dans le groupe (oui / non), demande de nom en privé aux numéros inconnus.
-8. **Confirmations J-2** et lecture des réponses en privé (une ou plusieurs demandes en attente).
-9. **J-1 à 20:00** : sans réponse, message « Nous vous confirmons… », liste finale dans le groupe.
-10. **Désistement tardif** → référent, **récap du vendredi**, **onglet Commandes**, alerte si WhatsApp déconnecté.
-11. **Test de bout en bout** : une semaine complète simulée avec les faux (`npm test`).
+6. **Planificateur et annonces J-7** (avec rattrapage). Décisions : rattrapage automatique jusqu'à J+(`JOURS_AVANT_CONFIRMATION` + 1) ; aucun envoi automatique après 22:00 (`HEURE_FIN_ENVOIS_AUTO`) ; marqueur « envoi-en-cours » écrit avant chaque annonce pour ne jamais renvoyer en double après un plantage ; un même avertissement n'est écrit qu'une fois par heure dans le Journal.
+7. **Réception** : réponses citées dans le groupe (oui / non), demande de nom en privé aux numéros inconnus. Décisions : NON dans le groupe → « Retiré » si Inscrit, « Désisté » si déjà En attente / Confirmé ; OUI après un NON → la même ligne repasse à Inscrit ; après réception du nom, le bot répond « Merci {prenom}, c'est noté ! » ; un message privé qui ne ressemble pas à un nom est ignoré (noté dans le Journal) ; tick et messages passent par une file d'attente commune (jamais deux écritures simultanées dans le Sheet).
+8. **Confirmations J-2** et lecture des réponses en privé (une ou plusieurs demandes en attente). Décisions : rattrapage si le bot était arrêté (envoi dès que possible, au plus tard la veille avant `HEURE_LISTE`) ; aucun envoi automatique avant 08:00 ni après 22:00 ; marqueur posé sur toutes les inscriptions en une écriture, résultats écrits par paquets de 10 (quota Google) ; changement d'avis en privé possible tant que la liste n'est pas publiée ; après la liste, plus de changement automatique (le référent corrige à la main) ; plusieurs demandes sans citation → le bot demande de citer ; un « Désisté » qui redit OUI dans le groupe reçoit une nouvelle demande.
+9. **J-1 à 20:00** : sans réponse, message « Nous vous confirmons… », liste finale dans le groupe. Décisions : ordre = Sans réponse → statut « Liste publiée » (écrit AVANT l'envoi, anti-doublon ; remis si l'envoi échoue) → liste dans le groupe (triée par nom) → messages privés aux confirmés ; rattrapage le jour même de 08:00 jusqu'à l'heure de l'action ; si les confirmations ne sont jamais parties (action encore « Annoncée »), pas de liste vide trompeuse : avertissement à l'équipe.
+10. **Désistement tardif** → référent, **récap du vendredi**, **onglet Commandes**, alerte si WhatsApp déconnecté. En deux commits : **10a** (désistement tardif + récap) et **10b** (commandes + alerte).
+   - 10b, décisions : commande décochée + « en cours… » AVANT exécution (jamais relancée en boucle) ; case lue « TRUE » ou « VRAI » (langue du Sheet), décochée en vidant la cellule ; pause = plus d'envoi automatique (commandes manuelles et réception des réponses continuent) ; tableau de bord « État du bot » en 1er onglet, alerte WhatsApp seulement au changement d'état (contrat `Alertes` + `combinerAlertes` prêt pour l'e-mail) ; « Dernier passage » écrit à chaque tick (détecte un bot/VPS arrêté).
+   - 10a, décisions : NON en privé d'un Confirmé après la liste (action pas encore passée) → Désisté + accusé + message au référent (avertissement Journal si pas de `NUMERO_REFERENT`) ; OUI après la liste → rien (le référent gère) ; récap = demain → J+7, sans les actions annulées, « N confirmés » / « N inscrits » / « pas encore annoncée » ; semaine vide → pas de message ; anti-doublon du récap via l'état local `data/etat.json` (créé dès 10a, écriture atomique). Décision (19/11/2026) : l'alerte « WhatsApp déconnecté » est d'abord **visible dans le Sheet** (bandeau rouge bien en vue, avec l'heure de la déconnexion, + Journal) ; un envoi d'e-mail au référent pourra être ajouté plus tard si besoin (WhatsApp étant justement indisponible, on ne peut pas prévenir par WhatsApp).
+11. **Test de bout en bout** : une semaine complète simulée avec les faux (`npm test`). Fait dans `tests/semaine.test.ts` : une quinzaine réelle (tick toutes les 15 min pendant 12 jours), 5 bénévoles, 2 actions, changements d'avis, inscription tardive, désistement tardif ; vérifie chaque message envoyé dans l'ordre exact. Vérifié qu'il attrape un bug d'annonce en double (164 messages au lieu de 6).
 12. **Déploiement** : `Dockerfile`, `docker-compose.yml` (WAHA + bot, volumes, redémarrage automatique), installation sur le VPS Oracle, sauvegarde de la session WAHA ; test réel dans un groupe WhatsApp de test avec le numéro dédié.
 13. **Documentation** : README pour l'asso (utilisation au quotidien par le référent) + guide d'exploitation pour les mainteneurs (mise à jour, rescanner le QR code, sauvegardes, que faire si WhatsApp casse).
+
+### Améliorations prévues (après la mise en service)
+
+14. **Alerte par e-mail au référent** (demandé le 19/11/2026 ; Rayane fournira l'adresse plus tard) : quand WhatsApp est déconnecté ou qu'une erreur grave se répète, envoyer un e-mail en plus de l'alerte dans le Sheet.
+   - Préparé dès l'étape 10 : contrat `Alertes` (comme `Messagerie`), première implémentation « Sheet » ; l'e-mail sera une seconde implémentation branchée à côté, sans toucher au code métier.
+   - Pistes (à valider le moment venu, nouvelle dépendance à justifier) : SMTP Gmail d'un compte de l'asso avec un « mot de passe d'application » (validation en 2 étapes obligatoire) + bibliothèque `nodemailer` ; ou un service d'envoi gratuit (ex. Brevo, quelques centaines d'e-mails/jour). Le compte de service Google ne peut pas envoyer d'e-mails Gmail (sauf Google Workspace avec délégation).
+   - Variables `.env` à prévoir : `ALERTE_EMAIL_DESTINATAIRE`, identifiants SMTP (secrets).
+   - Anti-spam : une alerte par problème et par période (comme l'anti-répétition du Journal), plus un e-mail « c'est réparé ».
 
 ---
 

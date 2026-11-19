@@ -25,6 +25,7 @@ describe('chargerConfig : valeurs par défaut', () => {
     expect(config.google).toEqual({ idSheet: 'id-du-sheet', fichierCle: './secrets/compte-service.json' });
     expect(config.groupeId).toBeNull();
     expect(config.port).toBe(3000);
+    expect(config.intervalleTickSecondes).toBe(60); // 1 minute par défaut
     expect(config.dossierDonnees).toBe('./data');
     expect(config.niveauLog).toBe('info');
   });
@@ -35,8 +36,10 @@ describe('chargerConfig : valeurs par défaut', () => {
       WAHA_URL: 'http://localhost:3001/',
       GROUPE_ID: '  120363000000000000@g.us ',
       PORT: '8080',
+      INTERVALLE_TICK_SECONDES: '300',
       NIVEAU_LOG: 'debug',
     });
+    expect(config.intervalleTickSecondes).toBe(300);
     expect(config.waha.url).toBe('http://localhost:3001'); // « / » final retiré
     expect(config.groupeId).toBe('120363000000000000@g.us');
     expect(config.port).toBe(8080);
@@ -69,6 +72,9 @@ describe('chargerConfig : erreurs claires', () => {
     ['PORT', 'abc'],
     ['PORT', '70000'],
     ['NIVEAU_LOG', 'bavard'],
+    ['INTERVALLE_TICK_SECONDES', '5'],
+    ['INTERVALLE_TICK_SECONDES', '7200'],
+    ['INTERVALLE_TICK_SECONDES', 'une minute'],
   ])('%s = « %s » est refusé', (nom, valeur) => {
     expect(erreurPour({ ...ENV_MINIMAL, [nom]: valeur }).message).toContain(nom);
   });

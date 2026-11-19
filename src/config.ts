@@ -24,6 +24,8 @@ export interface Config {
   /** ID du groupe WhatsApp des bénévoles. null tant qu'il n'est pas choisi (npm run lister-groupes). */
   groupeId: string | null;
   port: number; // port du serveur HTTP qui reçoit les webhooks de WAHA
+  /** Fréquence du planificateur (tick), en secondes. 60 par défaut. */
+  intervalleTickSecondes: number;
   dossierDonnees: string; // où le bot range son état local (data/etat.json)
   niveauLog: NiveauLog;
 }
@@ -72,6 +74,13 @@ export function chargerConfig(env: Environnement = process.env): Config {
     problemes.push(`PORT doit être un nombre entre 1 et 65535 : « ${env.PORT} »`);
   }
 
+  // Entre 10 s (inutile d'aller plus vite) et 1 h (au-delà, les commandes manuelles
+  // mettraient trop longtemps à s'exécuter).
+  const intervalleTickSecondes = Number(facultative('INTERVALLE_TICK_SECONDES', '60'));
+  if (!Number.isInteger(intervalleTickSecondes) || intervalleTickSecondes < 10 || intervalleTickSecondes > 3600) {
+    problemes.push(`INTERVALLE_TICK_SECONDES doit être un nombre entre 10 et 3600 : « ${env.INTERVALLE_TICK_SECONDES} »`);
+  }
+
   const niveauLog = facultative('NIVEAU_LOG', 'info');
   if (!estNiveauLog(niveauLog)) {
     problemes.push(`NIVEAU_LOG doit valoir ${NIVEAUX_LOG.join(', ')} : « ${niveauLog} »`);
@@ -86,6 +95,7 @@ export function chargerConfig(env: Environnement = process.env): Config {
     google: lireConfigGoogle(env, problemes),
     groupeId: env.GROUPE_ID?.trim() || null,
     port,
+    intervalleTickSecondes,
     dossierDonnees: facultative('DOSSIER_DONNEES', './data'),
     niveauLog: estNiveauLog(niveauLog) ? niveauLog : 'info',
   };
@@ -124,6 +134,7 @@ export function resumerConfig(config: Config): Record<string, string> {
     'Google Sheet': `${config.google.idSheet} — clé ${config.google.fichierCle}`,
     'Groupe WhatsApp': config.groupeId ?? '(pas encore choisi : npm run lister-groupes)',
     'Serveur': `port ${config.port}`,
+    'Planificateur': `toutes les ${config.intervalleTickSecondes} secondes`,
     'Données locales': config.dossierDonnees,
     'Niveau de log': config.niveauLog,
   };

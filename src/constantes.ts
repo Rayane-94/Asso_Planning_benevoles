@@ -12,8 +12,27 @@
 /** Fuseau horaire de tous les calculs de dates (le serveur, lui, est en UTC). */
 export const FUSEAU = 'Europe/Paris';
 
+/** Pause entre deux messages envoyés à la suite (évite les rafales, suspectes pour WhatsApp). */
+export const PAUSE_ENTRE_MESSAGES_MS = 2000;
+
+/**
+ * Aucun envoi AUTOMATIQUE après cette heure (on ne réveille pas les bénévoles la nuit).
+ * Les commandes manuelles de l'onglet Commandes ne sont pas concernées.
+ */
+export const HEURE_FIN_ENVOIS_AUTO = '22:00';
+
+/** Aucun envoi AUTOMATIQUE avant cette heure (rattrapage après une panne de nuit, par ex.). */
+export const HEURE_DEBUT_ENVOIS_AUTO = '08:00';
+
+/**
+ * Écrit dans « Message ID » juste AVANT d'envoyer une annonce. Si le bot plante entre
+ * l'envoi et l'enregistrement, ce marqueur empêche de renvoyer l'annonce en double.
+ */
+export const MARQUEUR_ENVOI_EN_COURS = 'envoi-en-cours';
+
 /** Noms des onglets du Google Sheet. */
 export const ONGLETS = {
+  ETAT: 'État du bot',
   ACTIONS: 'Actions',
   BENEVOLES: 'Bénévoles',
   INSCRIPTIONS: 'Inscriptions',
@@ -45,6 +64,19 @@ export const STATUT_INSCRIPTION = {
   RETIRE: 'Retiré', // a répondu NON à l'annonce
 } as const;
 export type StatutInscription = (typeof STATUT_INSCRIPTION)[keyof typeof STATUT_INSCRIPTION];
+
+/** Messages privés fixes du bot (les textes réglables par l'équipe sont dans Paramètres). */
+export const MESSAGES = {
+  DEMANDE_NOM: 'Bienvenue ! Pour la liste des présents, peux-tu me donner ton prénom et ton nom ?',
+  /** {prenom} est remplacé par le prénom reçu. */
+  MERCI_NOM: "Merci {prenom}, c'est noté !",
+  /** Après un OUI / NON en privé à une demande de confirmation. */
+  ACCUSE_RECEPTION: "C'est noté, merci !",
+  /** La personne a plusieurs demandes en attente et n'a pas cité laquelle. */
+  CITER_LE_MESSAGE: 'Tu as plusieurs actions en attente, réponds en citant le message concerné (appui long → Répondre).',
+  /** Au référent, quand un confirmé se désiste après la publication de la liste. */
+  ALERTE_DESISTEMENT: '⚠️ Désistement de dernière minute : {nom} ({telephone}) ne viendra pas à {type} – {date} à {heure} – {lieu}.',
+} as const;
 
 /** Commandes manuelles de l'onglet Commandes (remplacent le menu Apps Script, voir CLAUDE.md §5). */
 export const COMMANDES = {
