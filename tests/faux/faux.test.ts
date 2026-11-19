@@ -107,7 +107,7 @@ describe('FausseMessagerie', () => {
 describe('FauxTableur', () => {
   function tableurAvecActions(): FauxTableur {
     const tableur = new FauxTableur();
-    tableur.creerOnglet('Actions', ['ID', 'Type', 'Date', 'Statut'], [
+    tableur.preparerOnglet('Actions', ['ID', 'Type', 'Date', 'Statut'], [
       { ID: 'A-1', Type: 'BP', Date: '28/11/2026' },
       { ID: 'A-2', Type: 'Maraude', Date: '25/11/2026', Statut: 'Annoncée' },
     ]);

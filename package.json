@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:surveiller": "vitest",
     "types": "tsc",
-    "verifier": "npm run types && npm run test"
+    "verifier": "npm run types && npm run test",
+    "installer-sheet": "node scripts/installer-sheet.ts"
   },
   "engines": {
     "node": ">=24"
@@ -18,5 +19,8 @@
     "@types/node": "24.19.2",
     "typescript": "7.0.2",
     "vitest": "5.1.1"
+  },
+  "dependencies": {
+    "@googleapis/sheets": "18.1.3"
   }
 }

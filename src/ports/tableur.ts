@@ -48,6 +48,43 @@ export interface Tableur {
   supprimerLignes(onglet: string, debut: number, nombre: number): Promise<void>;
 }
 
+/**
+ * Opérations d'administration du Sheet, utilisées UNIQUEMENT par l'installation
+ * (`npm run installer-sheet`), jamais par le bot en fonctionnement normal.
+ */
+export interface AdministrationTableur {
+  listerOnglets(): Promise<string[]>;
+  creerOnglet(nom: string): Promise<void>;
+  /** En-têtes de la ligne 1 (tableau vide si l'onglet est vide). */
+  lireEntetes(onglet: string): Promise<string[]>;
+  /** Remplace toute la ligne 1 par ces en-têtes. */
+  ecrireEntetes(onglet: string, entetes: string[]): Promise<void>;
+  /**
+   * Applique formats, listes déroulantes, cases à cocher et colonnes masquées.
+   * Fige aussi la ligne d'en-têtes et la met en gras. Les colonnes sont désignées par leur nom.
+   */
+  configurerColonnes(onglet: string, colonnes: ConfigColonne[]): Promise<void>;
+  /**
+   * Séparateur d'arguments des formules, qui dépend de la langue du Sheet :
+   * ',' en anglais (=QUERY(A:K, "…", 1)), ';' en français (=QUERY(A:K; "…"; 1)).
+   */
+  separateurArguments(): Promise<SeparateurArguments>;
+  /** Écrit une formule dans la cellule A1 (vues Présents / Absents), telle qu'un humain la taperait. */
+  ecrireFormule(onglet: string, formule: string): Promise<void>;
+}
+
+export type SeparateurArguments = ',' | ';';
+
+/** Comment présenter une colonne dans le Sheet (voir sheets/schema.ts). */
+export interface ConfigColonne {
+  nom: string;
+  format: 'texte' | 'date' | 'case';
+  /** Liste déroulante : valeurs autorisées. */
+  choix?: string[];
+  /** Colonne technique cachée à l'équipe. */
+  masquee?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Aides partagées par toutes les implémentations (Google et faux)
 // ---------------------------------------------------------------------------

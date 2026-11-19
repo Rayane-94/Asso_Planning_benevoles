@@ -19,6 +19,7 @@ npm test             # lance les tests
 npm run types        # vérifie les types TypeScript
 npm run verifier     # les deux (c'est ce que fait la CI)
 npm run test:surveiller  # relance les tests à chaque modification
+npm run installer-sheet  # crée / répare les onglets du Google Sheet (voir docs/compte-service-google.md)
 ```
 
 ## Structure
@@ -28,8 +29,11 @@ src/
   constantes.ts   statuts, onglets, mots-clés OUI/NON, paramètres par défaut
   config.ts       lecture et vérification du .env
   ports/          contrats Messagerie (WhatsApp), Tableur (Sheet), Horloge
+  sheets/         Google Sheets : schéma des onglets, connexion Google, installation
   utils/          dates (fuseau Paris), téléphones, textes et détection OUI/NON, logger
 tests/            tests Vitest (même arborescence que src/)
   faux/           versions de test des contrats : fausse messagerie, faux Sheet, horloge contrôlée
+scripts/          commandes pour les mainteneurs (installer-sheet…)
+docs/             guides (compte de service Google…)
 CLAUDE.md         cahier des charges et décisions du projet
 ```
