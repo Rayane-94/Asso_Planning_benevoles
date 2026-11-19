@@ -46,6 +46,18 @@ export const STATUT_INSCRIPTION = {
 } as const;
 export type StatutInscription = (typeof STATUT_INSCRIPTION)[keyof typeof STATUT_INSCRIPTION];
 
+/** Commandes manuelles de l'onglet Commandes (remplacent le menu Apps Script, voir CLAUDE.md §5). */
+export const COMMANDES = {
+  ANNONCER: 'Annoncer maintenant',
+  CONFIRMATIONS: 'Envoyer les confirmations maintenant',
+  LISTE: 'Publier la liste de demain maintenant',
+  RECAP: 'Envoyer le récap maintenant',
+  VERIFIER: 'Vérifier la configuration',
+  PAUSE: 'Mettre le bot en pause',
+  REPRENDRE: 'Reprendre',
+} as const;
+export type Commande = (typeof COMMANDES)[keyof typeof COMMANDES];
+
 /** Résultat de la détection d'une réponse (voir detecterReponse dans utils/textes.ts). */
 export const REPONSE = {
   OUI: 'OUI',

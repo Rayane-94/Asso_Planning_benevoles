@@ -83,10 +83,7 @@ export function chargerConfig(env: Environnement = process.env): Config {
       cleApi: obligatoire('WAHA_API_KEY'),
       session: facultative('WAHA_SESSION', 'default'),
     },
-    google: {
-      idSheet: obligatoire('GOOGLE_SHEET_ID'),
-      fichierCle: facultative('GOOGLE_FICHIER_CLE', './secrets/compte-service.json'),
-    },
+    google: lireConfigGoogle(env, problemes),
     groupeId: env.GROUPE_ID?.trim() || null,
     port,
     dossierDonnees: facultative('DOSSIER_DONNEES', './data'),
@@ -95,6 +92,26 @@ export function chargerConfig(env: Environnement = process.env): Config {
 
   if (problemes.length > 0) throw new ErreurConfig(problemes);
   return config;
+}
+
+/**
+ * Lit uniquement la partie Google (pour `npm run installer-sheet`, qui n'a pas besoin de WhatsApp).
+ * @throws ErreurConfig si GOOGLE_SHEET_ID manque
+ */
+export function chargerConfigGoogle(env: Environnement = process.env): Config['google'] {
+  const problemes: string[] = [];
+  const google = lireConfigGoogle(env, problemes);
+  if (problemes.length > 0) throw new ErreurConfig(problemes);
+  return google;
+}
+
+function lireConfigGoogle(env: Environnement, problemes: string[]): Config['google'] {
+  const idSheet = env.GOOGLE_SHEET_ID?.trim() ?? '';
+  if (!idSheet) problemes.push('GOOGLE_SHEET_ID est obligatoire mais absente ou vide');
+  return {
+    idSheet,
+    fichierCle: env.GOOGLE_FICHIER_CLE?.trim() || './secrets/compte-service.json',
+  };
 }
 
 /**

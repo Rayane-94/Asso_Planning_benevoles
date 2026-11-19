@@ -58,7 +58,7 @@ L'accueil des nouveaux bénévoles : message automatique, transcription et résu
 |---|---|---|
 | Langage | **TypeScript** (mode `strict`) sur **Node.js 24** | Typage = moins de bugs, lisible ; Node 24 = version LTS |
 | Serveur HTTP (réception des webhooks WAHA) | **Express** | Le plus connu et documenté : facile à reprendre pour un junior |
-| Google Sheets | **googleapis** (bibliothèque officielle) + compte de service | Officielle, maintenue par Google |
+| Google Sheets | **@googleapis/sheets** (bibliothèque officielle, API Sheets seule : 0,8 Mo au lieu de 246 Mo pour `googleapis`) + compte de service | Officielle, maintenue par Google |
 | Tests | **Vitest** | Gère TypeScript sans configuration, horloge simulée intégrée |
 | Lancement | **Docker Compose** : 2 conteneurs, `waha` et `bot` | Une commande pour tout démarrer, redémarrage automatique |
 | CI | **GitHub Actions** : `npm run verifier` (types + tests) à chaque push | Déjà en place |
@@ -304,6 +304,7 @@ Côté développeurs (terminal du VPS) :
 - **Quotas de l'API Google Sheets** (≈ 60 lectures par minute et par utilisateur) : regrouper les lectures (une lecture de tous les onglets utiles par tick, `batchGet`), garder un cache court, regrouper les écritures.
 - **Numéros dans le Sheet** : écrire en mode « RAW » / colonnes au format texte, sinon `0612…` devient un nombre et perd son 0. Clé interne E.164 sans `+` (`33612345678`), affichage `06 12 34 56 78`.
 - **Heures et dates dans le Sheet** : lire les **valeurs affichées** (`FORMATTED_VALUE`), parser `19:00` / `19h` / `19h30` et `28/11/2026`. Comparer des clés `yyyy-MM-dd` et des heures `HH:mm` calculées dans le fuseau **Europe/Paris** (jamais l'heure du serveur, qui est en UTC).
+  - Décision (étape 4a) : le bot écrit tout en **RAW** (texte tel quel, jamais de formule ni de conversion) ; les dates qu'il écrit (Inscriptions, Bénévoles, Journal) sont au format texte **`2026-11-28`** (se trie correctement dans les vues QUERY). Seule la colonne Date d'Actions, remplie à la main, est une vraie date affichée `jj/mm/aaaa` (format imposé par l'installation, quel que soit le pays du Sheet). Le code qui lit une date doit donc accepter les deux formats.
 - **Formules QUERY** : écrites en syntaxe anglaise avec des virgules, même si le Sheet est en français.
 - **Idempotence** : un job ne s'exécute qu'une fois grâce aux statuts des actions et à des marqueurs par jour. Un redémarrage du bot au milieu d'un job ne doit **jamais** renvoyer un message.
 - **Secrets** : `.env` et clé Google jamais dans Git (vérifier `.gitignore`), jamais dans les logs.
@@ -314,6 +315,21 @@ Côté développeurs (terminal du VPS) :
 
 > Étapes 1 à 3 de la v2 déjà faites en JavaScript Apps Script (utilitaires, harness). La v3 repart de ces acquis : la logique des utilitaires et leurs cas de test sont **portés en TypeScript**, le harness Apps Script est remplacé par des faux plus simples (on injecte les dépendances au lieu de simuler Google).
 > Pas encore de numéro de test : on code d'abord tout ce qui se teste avec les faux (étapes 1 à 4, puis 6 à 11), et on fait le spike WAHA dès qu'un numéro est disponible, **avant l'étape 5**.
+
+### Organisation Git : une branche par bloc d'étapes (décidé le 19/11/2026)
+
+- Une **branche par bloc** ; à l'intérieur, toujours **une étape = un commit**. En fin de bloc : pull request vers `main`, fusion quand la CI est verte, suppression de la branche.
+- `main` doit toujours rester propre et fonctionnel.
+
+| Bloc | Branche | Étapes | Statut |
+|---|---|---|---|
+| 1 | `migration-vps-typescript` | 1, 2 | ✅ fusionné (PR #1) |
+| 2 | `donnees-sheet` | 3, 4 | en cours |
+| 3 | `bloc-3-whatsapp` | 0, 5 (numéro de test nécessaire) | |
+| 4 | `bloc-4-fonctionnalites` | 6 à 11 | |
+| 5 | `bloc-5-mise-en-production` | 12, 13 | |
+
+Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 
 0. **Spike VPS + WAHA** (script jetable) : créer la machine Oracle, installer Docker, lancer WAHA, scanner le QR code avec le numéro de test, puis vérifier :
    - envoi dans un groupe de test et récupération de l'ID du message ;
@@ -326,7 +342,9 @@ Côté développeurs (terminal du VPS) :
 1. **Migration vers TypeScript** : `package.json`, `tsconfig.json` (strict), Vitest, scripts `npm run verifier` (types + tests), CI mise à jour ; suppression des fichiers Apps Script (`appsscript.json`, clasp, harness Google) ; portage des utilitaires (dates, téléphones, textes, détection oui/non) et de leurs tests.
 2. **Configuration** : `config.ts` (lecture et vérification du `.env`, message clair si une variable manque), `constantes.ts`, `.env.example`, logger console.
 3. **Ports et faux** : interfaces `Messagerie`, `Horloge`, `Tableur` ; faux en mémoire pour les tests (faux Sheet, fausse messagerie, horloge contrôlée).
-4. **Couche Google Sheets** : accès par en-têtes, un module par onglet, Paramètres, Journal, génération d'ID ; script `installer-sheet` ; création du compte de service (guide pas à pas).
+4. **Couche Google Sheets**, en deux commits :
+   - **4a — connexion et installation** : implémentation Google du `Tableur` (lecture des valeurs affichées, écriture RAW), schéma des onglets (`sheets/schema.ts`), `npm run installer-sheet` (idempotent), guide `docs/compte-service-google.md`.
+   - **4b — modules par onglet** : Actions, Bénévoles, Inscriptions, Paramètres (lecture typée), Journal (écriture + 1000 lignes max), génération d'ID.
 5. **Adaptateur WAHA + serveur** : envoi, citation, groupes, vérification de connexion, conversion des webhooks en `MessageRecu`, gestion des LID, déduplication, état local ; serveur Express (`/webhook/waha`, `/sante`) ; script `lister-groupes`.
 6. **Planificateur et annonces J-7** (avec rattrapage).
 7. **Réception** : réponses citées dans le groupe (oui / non), demande de nom en privé aux numéros inconnus.
