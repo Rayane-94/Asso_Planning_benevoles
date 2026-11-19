@@ -7,7 +7,9 @@
  *   await env.planificateur.tick();
  *   env.messagerie.dernierEnvoi().texte; // → '📣 BP – samedi 28/11 à 14:00 – Entrepôt…'
  */
+import { creerMemoireMessages } from '../../src/etat/memoireMessages.ts';
 import type { Contexte } from '../../src/metier/contexte.ts';
+import { creerFileExclusive } from '../../src/utils/fileExclusive.ts';
 import { creerPlanificateur, type Planificateur } from '../../src/planificateur.ts';
 import type { Valeurs } from '../../src/ports/tableur.ts';
 import { creerLoggerSansRepetition } from '../../src/utils/antiRepetition.ts';
@@ -34,7 +36,10 @@ export async function contexteDeTest(depart = '2026-11-21 18:00'): Promise<Envir
   const logs: string[] = [];
   const logger = creerLoggerSansRepetition(creerLogger('debug', (ligne) => logs.push(ligne), () => horloge.maintenant()), horloge);
 
-  const ctx: Contexte = { tableur, messagerie, horloge, logger, groupeId: GROUPE_TEST };
+  const ctx: Contexte = {
+    tableur, messagerie, horloge, logger, groupeId: GROUPE_TEST,
+    file: creerFileExclusive(), memoireMessages: creerMemoireMessages(),
+  };
   return { ctx, tableur, messagerie, horloge, planificateur: creerPlanificateur(ctx), logs };
 }
 

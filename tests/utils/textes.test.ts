@@ -1,6 +1,32 @@
 import { describe, expect, test } from 'vitest';
 import { PARAMETRES_DEFAUT } from '../../src/constantes.ts';
-import { detecterReponse, normaliserPourDetection, remplirModele } from '../../src/utils/textes.ts';
+import { detecterReponse, lireNomComplet, normaliserPourDetection, remplirModele } from '../../src/utils/textes.ts';
+
+describe('lireNomComplet : la réponse à « ton prénom et ton nom ? »', () => {
+  test.each([
+    ['bob durand', 'Bob', 'Durand'],
+    ['BOB DURAND', 'Bob', 'Durand'],
+    ['  Alice   Martin ', 'Alice', 'Martin'],
+    ['Alice', 'Alice', ''],
+    ['jean-pierre de la tour', 'Jean-Pierre', 'De La Tour'],
+    ['Awa N’Diaye', 'Awa', 'N’Diaye'], // apostrophe typographique (iPhone)
+    ['Ronan McDonald', 'Ronan', 'McDonald'], // casse mixte gardée telle quelle
+    ['Élodie Bérénice', 'Élodie', 'Bérénice'],
+  ])('« %s » → prénom « %s », nom « %s »', (texte, prenom, nom) => {
+    expect(lireNomComplet(texte)).toEqual({ prenom, nom });
+  });
+
+  test.each([
+    "c'est à quelle heure ?",
+    'Bob 06 12 34 56 78',
+    '',
+    'je ne sais pas trop quoi te répondre là',
+    'bob@mail.com',
+    '👍',
+  ])('« %s » → pas un nom (null)', (texte) => {
+    expect(lireNomComplet(texte)).toBeNull();
+  });
+});
 
 describe('remplirModele', () => {
   test('remplace les variables connues', () => {

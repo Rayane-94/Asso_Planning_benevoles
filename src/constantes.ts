@@ -61,6 +61,13 @@ export const STATUT_INSCRIPTION = {
 } as const;
 export type StatutInscription = (typeof STATUT_INSCRIPTION)[keyof typeof STATUT_INSCRIPTION];
 
+/** Messages privés fixes du bot (les textes réglables par l'équipe sont dans Paramètres). */
+export const MESSAGES = {
+  DEMANDE_NOM: 'Bienvenue ! Pour la liste des présents, peux-tu me donner ton prénom et ton nom ?',
+  /** {prenom} est remplacé par le prénom reçu. */
+  MERCI_NOM: "Merci {prenom}, c'est noté !",
+} as const;
+
 /** Commandes manuelles de l'onglet Commandes (remplacent le menu Apps Script, voir CLAUDE.md §5). */
 export const COMMANDES = {
   ANNONCER: 'Annoncer maintenant',

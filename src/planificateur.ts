@@ -55,11 +55,14 @@ export function creerPlanificateur(ctx: Contexte, journal?: Enregistrable): Plan
     }
     enCours = true;
     try {
-      const donnees = await lireDonnees();
-      if (donnees) {
-        await tache('Annonces', () => publierAnnonces(ctx, donnees, 'automatique'));
-        // Étapes suivantes : réception des réponses, confirmations J-2, liste J-1, récap, commandes…
-      }
+      // Dans la file partagée avec les messages reçus : jamais deux écritures simultanées.
+      await ctx.file.executer(async () => {
+        const donnees = await lireDonnees();
+        if (donnees) {
+          await tache('Annonces', () => publierAnnonces(ctx, donnees, 'automatique'));
+          // Étapes suivantes : confirmations J-2, liste J-1, récap, commandes…
+        }
+      });
     } finally {
       enCours = false;
       if (journal) {
