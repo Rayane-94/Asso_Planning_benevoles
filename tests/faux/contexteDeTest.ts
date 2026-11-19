@@ -12,6 +12,7 @@ import { creerMemoireMessages } from '../../src/etat/memoireMessages.ts';
 import type { Contexte } from '../../src/metier/contexte.ts';
 import { creerFileExclusive } from '../../src/utils/fileExclusive.ts';
 import { creerPlanificateur, type Planificateur } from '../../src/planificateur.ts';
+import { creerAlertesSheet } from '../../src/sheets/etatBot.ts';
 import type { Valeurs } from '../../src/ports/tableur.ts';
 import { creerLoggerSansRepetition } from '../../src/utils/antiRepetition.ts';
 import { creerLogger } from '../../src/utils/logger.ts';
@@ -40,6 +41,7 @@ export async function contexteDeTest(depart = '2026-11-21 18:00'): Promise<Envir
   const ctx: Contexte = {
     tableur, messagerie, horloge, logger, groupeId: GROUPE_TEST,
     file: creerFileExclusive(), memoireMessages: creerMemoireMessages(), etat: creerEtatEnMemoire(),
+    alertes: creerAlertesSheet(tableur),
   };
   return { ctx, tableur, messagerie, horloge, planificateur: creerPlanificateur(ctx), logs };
 }

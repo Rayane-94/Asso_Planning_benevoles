@@ -12,7 +12,9 @@
  */
 import { COMMANDES, ONGLETS, PARAMETRES_DEFAUT } from '../constantes.ts';
 import type { AdministrationTableur, Tableur } from '../ports/tableur.ts';
-import { COLONNES_COMMANDES, COLONNES_PARAMETRES, definitionsOnglets, formulesVues } from './schema.ts';
+import {
+  COLONNES_COMMANDES, COLONNES_ETAT, COLONNES_PARAMETRES, definitionsOnglets, ELEMENTS_ETAT, formulesVues,
+} from './schema.ts';
 
 export interface DependancesInstallation {
   tableur: Tableur;
@@ -30,7 +32,8 @@ export async function installerSheet({ tableur, admin }: DependancesInstallation
   // 1) Onglets de données et leurs en-têtes
   for (const definition of definitions) {
     if (!existants.includes(definition.nom)) {
-      await admin.creerOnglet(definition.nom);
+      // Le tableau de bord « État du bot » en premier : c'est ce que l'équipe voit en ouvrant le Sheet.
+      await admin.creerOnglet(definition.nom, definition.nom === ONGLETS.ETAT ? 0 : undefined);
       rapport.push(`Onglet « ${definition.nom} » créé`);
     }
     const entetes = await admin.lireEntetes(definition.nom);
@@ -44,8 +47,9 @@ export async function installerSheet({ tableur, admin }: DependancesInstallation
   // 2) Paramètres par défaut (sans écraser ceux que l'équipe a modifiés)
   const typesActions = await completerParametres(tableur, rapport);
 
-  // 3) Lignes de l'onglet Commandes
+  // 3) Lignes de l'onglet Commandes et du tableau de bord
   await completerCommandes(tableur, rapport);
+  await completerEtat(tableur, rapport);
 
   // 4) Formats, listes déroulantes, cases à cocher, colonnes masquées
   for (const definition of definitionsOnglets(typesActions)) {
@@ -84,6 +88,20 @@ async function completerParametres(tableur: Tableur, rapport: string[]): Promise
 
   const types = presents.get('TYPES_ACTIONS') ?? PARAMETRES_DEFAUT.TYPES_ACTIONS.valeur;
   return types.split(',').map((type) => type.trim()).filter((type) => type !== '');
+}
+
+/** Ajoute les lignes manquantes du tableau de bord « État du bot ». */
+async function completerEtat(tableur: Tableur, rapport: string[]): Promise<void> {
+  const E = COLONNES_ETAT;
+  const { lignes } = await tableur.lireOnglet(ONGLETS.ETAT);
+  const presents = new Set(lignes.map((ligne) => ligne.valeurs[E.ELEMENT].trim()));
+  const aAjouter = Object.values(ELEMENTS_ETAT)
+    .filter((element) => !presents.has(element))
+    .map((element) => ({ [E.ELEMENT]: element, [E.ETAT]: '❔ Pas encore vérifié' }));
+  if (aAjouter.length > 0) {
+    await tableur.ajouterLignes(ONGLETS.ETAT, aAjouter);
+    rapport.push(`Tableau de bord : ${aAjouter.map((ligne) => ligne[E.ELEMENT]).join(', ')}`);
+  }
 }
 
 /** Ajoute les commandes absentes de l'onglet Commandes (case « Lancer » décochée = vide). */

@@ -3,7 +3,10 @@
  * Bob et Alice sont inscrits. Jeudi 26/11 = J-2 ; vendredi 27/11 = J-1.
  */
 import { describe, expect, test } from 'vitest';
+import { envoyerConfirmations } from '../../src/metier/confirmations.ts';
 import { recevoirMessage } from '../../src/metier/reception.ts';
+import { lireActions } from '../../src/sheets/actions.ts';
+import { lireParametres } from '../../src/sheets/parametres.ts';
 import { GROUPE_TEST } from '../faux/fausseMessagerie.ts';
 import { ajouterAction, contexteDeTest, logsDeNiveau, type EnvironnementDeTest } from '../faux/contexteDeTest.ts';
 import { ajouterLignesDeTest } from '../faux/sheetDeTest.ts';
@@ -56,7 +59,10 @@ describe('envoi des demandes à J-2', () => {
 
   test('messages espacés de 2 secondes ; résultats écrits en peu de requêtes (quota Google)', async () => {
     const env = await preparer();
-    await env.planificateur.tick();
+    // On appelle la tâche seule (sans le tick, qui écrit aussi le tableau de bord) pour ne compter qu'elle.
+    const donnees = { parametres: (await lireParametres(env.tableur)).parametres, actions: (await lireActions(env.tableur)).actions };
+    env.tableur.appels.ecritures = 0;
+    await envoyerConfirmations(env.ctx, donnees, 'automatique');
     expect(env.horloge.pauses).toEqual([2000]);
     // marqueur (1) + résultats (1) + statut de l'action (1) = 3 écritures pour 2 personnes
     expect(env.tableur.appels.ecritures).toBe(3);

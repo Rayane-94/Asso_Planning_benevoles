@@ -7,6 +7,7 @@
  */
 import type { EtatLocal } from '../etat/etatLocal.ts';
 import type { MemoireMessages } from '../etat/memoireMessages.ts';
+import type { Alertes } from '../ports/alertes.ts';
 import type { Horloge } from '../ports/horloge.ts';
 import type { FileExclusive } from '../utils/fileExclusive.ts';
 import type { Messagerie } from '../ports/messagerie.ts';
@@ -28,6 +29,8 @@ export interface Contexte {
   memoireMessages: MemoireMessages;
   /** Petite mémoire persistante (ex. « récap de la semaine déjà envoyé »). */
   etat: EtatLocal;
+  /** Où prévenir l'équipe d'un problème grave (tableau de bord du Sheet ; e-mail plus tard). */
+  alertes: Alertes;
 }
 
 /** Ce que le tick lit une fois dans le Sheet et partage entre toutes les tâches (économise le quota). */

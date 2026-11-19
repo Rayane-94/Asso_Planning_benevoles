@@ -4,8 +4,11 @@
  * Toutes les minutes, tick() :
  *   1. lit le Sheet UNE fois (paramètres + actions) et signale les lignes inutilisables ;
  *   2. donne un ID aux nouvelles actions ;
- *   3. lance chaque tâche dont c'est l'heure (pour l'instant : les annonces) ;
- *   4. écrit le Journal dans le Sheet.
+ *   3. exécute les commandes cochées dans l'onglet Commandes ;
+ *   4. sauf si le bot est en pause : annonces, confirmations, liste finale, récap
+ *      (chacune ne fait quelque chose que si c'est son heure) ;
+ *   5. met à jour le tableau de bord (connexion WhatsApp, « dernier passage ») ;
+ *   6. écrit le Journal dans le Sheet.
  *
  * Sécurités :
  *   - un seul tick à la fois (si le précédent n'est pas fini, on saute ce tour) ;
@@ -18,7 +21,10 @@ import { publierAnnonces } from './metier/annonces.ts';
 import { envoyerConfirmations } from './metier/confirmations.ts';
 import { publierListes } from './metier/listeFinale.ts';
 import { envoyerRecap } from './metier/recap.ts';
+import { estEnPause, executerCommandes } from './metier/commandes.ts';
+import { surveillerWhatsApp } from './metier/surveillance.ts';
 import { attribuerIdsActions, lireActions } from './sheets/actions.ts';
+import { noterDernierPassage } from './sheets/etatBot.ts';
 import { lireParametres } from './sheets/parametres.ts';
 
 /** Ce qui doit être écrit à la fin de chaque tick (le Journal du Sheet). */
@@ -62,12 +68,20 @@ export function creerPlanificateur(ctx: Contexte, journal?: Enregistrable): Plan
       await ctx.file.executer(async () => {
         const donnees = await lireDonnees();
         if (donnees) {
-          await tache('Annonces', () => publierAnnonces(ctx, donnees, 'automatique'));
-          await tache('Confirmations', () => envoyerConfirmations(ctx, donnees, 'automatique'));
-          await tache('Liste finale', () => publierListes(ctx, donnees, 'automatique'));
-          await tache('Récap', () => envoyerRecap(ctx, donnees, 'automatique'));
-          // Étape 10b : commandes manuelles, alerte WhatsApp déconnecté
+          // Les commandes d'abord : « Reprendre » doit agir dès ce tick.
+          await tache('Commandes', () => executerCommandes(ctx, donnees));
+          if (estEnPause(ctx)) {
+            ctx.logger.debug('Bot en pause : pas d\'envoi automatique');
+          } else {
+            await tache('Annonces', () => publierAnnonces(ctx, donnees, 'automatique'));
+            await tache('Confirmations', () => envoyerConfirmations(ctx, donnees, 'automatique'));
+            await tache('Liste finale', () => publierListes(ctx, donnees, 'automatique'));
+            await tache('Récap', () => envoyerRecap(ctx, donnees, 'automatique'));
+          }
         }
+        // Tableau de bord « État du bot » : connexion WhatsApp et « dernier passage »
+        await tache('Surveillance WhatsApp', () => surveillerWhatsApp(ctx));
+        await tache('Dernier passage', () => noterDernierPassage(ctx.tableur, ctx.horloge.maintenant()));
       });
     } finally {
       enCours = false;

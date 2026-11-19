@@ -111,8 +111,8 @@ export class GoogleSheets implements Tableur, AdministrationTableur {
     return (await this.proprietesOnglets()).map((p) => p.title ?? '');
   }
 
-  async creerOnglet(nom: string): Promise<void> {
-    await this.modifierStructure(nom, [{ addSheet: { properties: { title: nom } } }]);
+  async creerOnglet(nom: string, position?: number): Promise<void> {
+    await this.modifierStructure(nom, [{ addSheet: { properties: { title: nom, index: position } } }]);
   }
 
   async lireEntetes(onglet: string): Promise<string[]> {

@@ -32,6 +32,7 @@ export const MARQUEUR_ENVOI_EN_COURS = 'envoi-en-cours';
 
 /** Noms des onglets du Google Sheet. */
 export const ONGLETS = {
+  ETAT: 'État du bot',
   ACTIONS: 'Actions',
   BENEVOLES: 'Bénévoles',
   INSCRIPTIONS: 'Inscriptions',
