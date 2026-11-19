@@ -329,7 +329,7 @@ Côté développeurs (terminal du VPS) :
 | 1 | `migration-vps-typescript` | 1, 2 | ✅ fusionné (PR #1) |
 | 2 | `donnees-sheet` | 3, 4 | ✅ fusionné (PR #2) |
 | 3 | `bloc-3-whatsapp` | 0, 5 (numéro de test nécessaire) | |
-| 4 | `bloc-4-fonctionnalites` | 6 à 11 | en cours (fait avant le bloc 3 : pas encore de numéro de test) |
+| 4 | `bloc-4-fonctionnalites` | 6 à 11 | terminé (fait avant le bloc 3 : pas encore de numéro de test) — PR à fusionner |
 | 5 | `bloc-5-mise-en-production` | 12, 13 | |
 
 Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
@@ -356,7 +356,7 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 10. **Désistement tardif** → référent, **récap du vendredi**, **onglet Commandes**, alerte si WhatsApp déconnecté. En deux commits : **10a** (désistement tardif + récap) et **10b** (commandes + alerte).
    - 10b, décisions : commande décochée + « en cours… » AVANT exécution (jamais relancée en boucle) ; case lue « TRUE » ou « VRAI » (langue du Sheet), décochée en vidant la cellule ; pause = plus d'envoi automatique (commandes manuelles et réception des réponses continuent) ; tableau de bord « État du bot » en 1er onglet, alerte WhatsApp seulement au changement d'état (contrat `Alertes` + `combinerAlertes` prêt pour l'e-mail) ; « Dernier passage » écrit à chaque tick (détecte un bot/VPS arrêté).
    - 10a, décisions : NON en privé d'un Confirmé après la liste (action pas encore passée) → Désisté + accusé + message au référent (avertissement Journal si pas de `NUMERO_REFERENT`) ; OUI après la liste → rien (le référent gère) ; récap = demain → J+7, sans les actions annulées, « N confirmés » / « N inscrits » / « pas encore annoncée » ; semaine vide → pas de message ; anti-doublon du récap via l'état local `data/etat.json` (créé dès 10a, écriture atomique). Décision (19/11/2026) : l'alerte « WhatsApp déconnecté » est d'abord **visible dans le Sheet** (bandeau rouge bien en vue, avec l'heure de la déconnexion, + Journal) ; un envoi d'e-mail au référent pourra être ajouté plus tard si besoin (WhatsApp étant justement indisponible, on ne peut pas prévenir par WhatsApp).
-11. **Test de bout en bout** : une semaine complète simulée avec les faux (`npm test`).
+11. **Test de bout en bout** : une semaine complète simulée avec les faux (`npm test`). Fait dans `tests/semaine.test.ts` : une quinzaine réelle (tick toutes les 15 min pendant 12 jours), 5 bénévoles, 2 actions, changements d'avis, inscription tardive, désistement tardif ; vérifie chaque message envoyé dans l'ordre exact. Vérifié qu'il attrape un bug d'annonce en double (164 messages au lieu de 6).
 12. **Déploiement** : `Dockerfile`, `docker-compose.yml` (WAHA + bot, volumes, redémarrage automatique), installation sur le VPS Oracle, sauvegarde de la session WAHA ; test réel dans un groupe WhatsApp de test avec le numéro dédié.
 13. **Documentation** : README pour l'asso (utilisation au quotidien par le référent) + guide d'exploitation pour les mainteneurs (mise à jour, rescanner le QR code, sauvegardes, que faire si WhatsApp casse).
 
