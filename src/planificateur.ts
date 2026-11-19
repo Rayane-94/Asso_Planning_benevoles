@@ -16,6 +16,7 @@
 import type { Contexte, DonneesDuTick } from './metier/contexte.ts';
 import { publierAnnonces } from './metier/annonces.ts';
 import { envoyerConfirmations } from './metier/confirmations.ts';
+import { publierListes } from './metier/listeFinale.ts';
 import { attribuerIdsActions, lireActions } from './sheets/actions.ts';
 import { lireParametres } from './sheets/parametres.ts';
 
@@ -62,7 +63,8 @@ export function creerPlanificateur(ctx: Contexte, journal?: Enregistrable): Plan
         if (donnees) {
           await tache('Annonces', () => publierAnnonces(ctx, donnees, 'automatique'));
           await tache('Confirmations', () => envoyerConfirmations(ctx, donnees, 'automatique'));
-          // Étapes suivantes : liste J-1, récap, commandes…
+          await tache('Liste finale', () => publierListes(ctx, donnees, 'automatique'));
+          // Étape 10 : récap du vendredi, commandes, alerte WhatsApp…
         }
       });
     } finally {
