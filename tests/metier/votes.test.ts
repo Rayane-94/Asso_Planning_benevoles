@@ -111,6 +111,20 @@ describe('sondage avec créneaux', () => {
     expect(logsDeNiveau(env, 'INFO').some((l) => l.startsWith('Créneau modifié'))).toBe(true);
   });
 
+  test('test réel du 20/11 : « pas dispo » écrit dans Créneaux, puis voté → Retiré (pas inscrit sur un créneau « pas dispo »)', async () => {
+    const env = await apresAnnonce(`${CRENEAU_1}, ${CRENEAU_2}, pas dispo`);
+    await vote(env, [CRENEAU_1]);
+    await vote(env, ['pas dispo']); // le choix « pas dispo » écrit par le référent
+    expect(inscriptions(env)).toEqual([`Bob : Retiré [${CRENEAU_1}]`]);
+  });
+
+  test('« pas dispo » écrit dans Créneaux : le sondage ne le propose qu\'une fois', async () => {
+    const env = await contexteDeTest('2026-11-21 18:00');
+    await ajouterAction(env, { Type: 'BP', Date: '28/11/2026', Heure: '14:00', Créneaux: `${CRENEAU_1}, pas dispo` });
+    await env.planificateur.tick();
+    expect(env.messagerie.sondages()[0].sondage?.choix).toEqual([CRENEAU_1, 'pas dispo :/']);
+  });
+
   test('un créneau ET « pas dispo » cochés en même temps : le créneau l\'emporte (il a coché qu\'il venait)', async () => {
     const env = await apresAnnonce(`${CRENEAU_1}, ${CRENEAU_2}`);
     await vote(env, [CRENEAU_1, 'pas dispo :/']);

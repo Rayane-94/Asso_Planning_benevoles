@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { attribuerIdsActions, lireActions, modifierAction } from '../../src/sheets/actions.ts';
+import { attribuerIdsActions, lireActions, modifierAction, veutDirePasDispo } from '../../src/sheets/actions.ts';
 import { prochainId } from '../../src/sheets/ids.ts';
 import { ajouterLignesDeTest, sheetInstalle } from '../faux/sheetDeTest.ts';
 
@@ -39,6 +39,25 @@ describe('lireActions : créneaux du sondage', () => {
     ]);
     const { actions } = await lireActions(tableur);
     expect(actions.map((a) => a.creneaux)).toEqual([['dispo de 10h à 13h', 'dispo de 13h à 16h'], []]);
+  });
+
+  test('un créneau « pas dispo » écrit par le référent est retiré (le bot l\'ajoute déjà lui-même) — test réel du 20/11', async () => {
+    const tableur = await sheetInstalle();
+    await ajouterLignesDeTest(tableur, 'Actions', [
+      { Type: 'BP', Date: '28/11/2026', Heure: '10:00', Créneaux: 'dispo de 12h à 14h, dispo de 16h à 18h, pas dispo' },
+    ]);
+    const { actions } = await lireActions(tableur);
+    expect(actions[0].creneaux).toEqual(['dispo de 12h à 14h', 'dispo de 16h à 18h']);
+  });
+
+  test.each(['pas dispo', 'Pas dispo :/', 'pas disponible', 'PAS DISPO !!', 'indispo', 'non dispo'])(
+    '« %s » veut dire « pas dispo »', (texte) => {
+      expect(veutDirePasDispo(texte)).toBe(true);
+    },
+  );
+
+  test.each(['dispo de 10h à 13h', 'dispo !!', 'disponible le matin', 'passage 14h'])('« %s » est un vrai créneau', (texte) => {
+    expect(veutDirePasDispo(texte)).toBe(false);
   });
 
   test.each([

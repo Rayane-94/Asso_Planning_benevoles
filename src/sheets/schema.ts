@@ -107,7 +107,8 @@ export function definitionsOnglets(typesActions: string[]): DefinitionOnglet[] {
         texte(A.CRENEAUX, {
           aRemplir: true,
           aide: 'Facultatif. Les choix du sondage, séparés par des virgules. Exemple : dispo de 10h à 13h, dispo de 13h à 16h\n' +
-            'Laisser vide pour un sondage simple « dispo !! / pas dispo :/ ». « pas dispo » est ajouté tout seul. 11 créneaux maximum.',
+            'Laisser vide pour un sondage simple « dispo !! / pas dispo :/ ».\n' +
+            '⚠️ Ne pas écrire « pas dispo » : le bot l\'ajoute tout seul à la fin du sondage. 11 créneaux maximum.',
         }),
         texte(A.PLACES, { aRemplir: true, aide: 'Facultatif. Nombre de places, pour information. Exemple : 10' }),
         texte(A.STATUT, { choix: statutsAction, aide: 'Rempli par le bot. Pour annuler une action : choisir « Annulée » (puis prévenir les bénévoles à la main).' }),

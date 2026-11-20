@@ -12,8 +12,7 @@
     "verifier": "npm run types && npm run test",
     "start": "node src/index.ts",
     "installer-sheet": "node scripts/installer-sheet.ts",
-    "lister-groupes": "node scripts/lister-groupes.ts",
-    "spike-sondage": "node scripts/spike-sondage.ts"
+    "lister-groupes": "node scripts/lister-groupes.ts"
   },
   "engines": {
     "node": ">=24"
