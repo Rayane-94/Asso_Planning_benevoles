@@ -377,6 +377,18 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 12. **Déploiement** : `Dockerfile`, `docker-compose.yml` (WAHA + bot, volumes, redémarrage automatique), installation sur le VPS Oracle, sauvegarde de la session WAHA ; test réel dans un groupe WhatsApp de test avec le numéro dédié.
 13. **Documentation** : README pour l'asso (utilisation au quotidien par le référent) + guide d'exploitation pour les mainteneurs (mise à jour, rescanner le QR code, sauvegardes, que faire si WhatsApp casse).
 
+### À faire avant la mise en production (décidé le 20/11/2026)
+
+- **Le groupe de l'asso est une Communauté WhatsApp** (« Ummanite », canal *Announcements* : seuls les admins publient, les membres peuvent répondre). Conséquences :
+  - le **numéro dédié du bot** doit être ajouté à la communauté puis **nommé administrateur** (par un admin actuel) ;
+  - dans une communauté, les numéros des membres sont souvent **masqués** (visibles des admins seulement) → **à tester** : le bot admin obtient-il le vrai numéro (`SenderAlt`) des membres qui répondent ou votent ?
+  - à tester aussi : réponses citées et votes dans un canal d'annonces (comportement possiblement différent d'un groupe classique).
+- **Sondages WhatsApp** (demandé le 20/11/2026, à valider avec la responsable) : remplacer (ou compléter) le « OUI en citant l'annonce » par un **vrai sondage WhatsApp**, comme ceux que la responsable fait à la main (ex. « dispo de 10h à 13h / dispo de 13h à 16h / pas dispo :/ »).
+  - Côté Sheet : nouvelle colonne facultative **Créneaux** dans Actions (ex. `10h-13h, 13h-16h`) ; vide → « dispo / pas dispo ». Nouvelle colonne **Créneau** dans Inscriptions (et dans Présents / la liste finale, regroupée par créneau).
+  - Côté WAHA : `POST /api/sendPoll` (envoi) et événement `poll.vote` (votes, y compris changement ou retrait de vote) — présents dans WAHA 2026.10.1, **support par le moteur GOWS à vérifier**.
+  - Vote pour un créneau → inscription (avec le créneau) ; « pas dispo » ou vote retiré → Retiré ; le « OUI » cité reste en secours.
+  - Étapes : **spike sondages** (groupe de test, puis communauté de test) → adaptateur (envoi + votes) → code métier (créneaux partout). Estimation : 2 à 3 étapes.
+
 ### Améliorations prévues (après la mise en service)
 
 14. **Alerte par e-mail au référent** (demandé le 19/11/2026 ; Rayane fournira l'adresse plus tard) : quand WhatsApp est déconnecté ou qu'une erreur grave se répète, envoyer un e-mail en plus de l'alerte dans le Sheet.
