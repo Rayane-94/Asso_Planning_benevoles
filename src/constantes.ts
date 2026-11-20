@@ -72,8 +72,8 @@ export const MESSAGES = {
   MERCI_NOM: "Merci {prenom}, c'est noté !",
   /** Après un OUI / NON en privé à une demande de confirmation. */
   ACCUSE_RECEPTION: "C'est noté, merci !",
-  /** La personne a plusieurs demandes en attente et n'a pas cité laquelle. */
-  CITER_LE_MESSAGE: 'Tu as plusieurs actions en attente, réponds en citant le message concerné (appui long → Répondre).',
+  /** La personne a répondu OUI / NON par écrit, mais a plusieurs demandes en attente. */
+  CITER_LE_MESSAGE: 'Tu as plusieurs actions en attente : réponds dans le sondage de chacune (ou en citant le message concerné).',
   /** NON en privé alors que la personne est inscrite à plusieurs actions. */
   CITER_POUR_RETIRER:
     "Tu es inscrit(e) à plusieurs actions : pour te retirer, décoche ton vote dans le sondage de l'action concernée (ou coche « pas dispo »).",
@@ -146,13 +146,15 @@ export const PARAMETRES_DEFAUT = {
   TYPES_ACTIONS: { valeur: 'Maraude, BP, Paniers anti-gaspi, Collecte, Événement, Ménage', description: "Types d'actions proposés dans la liste déroulante" },
   OPTION_DISPO: { valeur: 'dispo !!', description: "Choix « je viens » du sondage, quand l'action n'a pas de créneaux" },
   OPTION_PAS_DISPO: { valeur: 'pas dispo :/', description: 'Choix « je ne viens pas » du sondage (toujours en dernier)' },
+  OPTION_CONFIRMER_OUI: { valeur: '✅ Oui, je serai là', description: 'Choix « je confirme » du sondage de confirmation (en privé, J-2)' },
+  OPTION_CONFIRMER_NON: { valeur: '❌ Non, je ne peux plus', description: 'Choix « je ne viens plus » du sondage de confirmation (en privé, J-2)' },
   TEXTE_ANNONCE: {
     valeur: '📣 {type} – {date} à {heure} – {lieu}\n👇 Votez dans le sondage ci-dessous pour participer.',
     description: 'Annonce publiée dans le groupe, juste avant le sondage',
   },
   TEXTE_CONFIRMATION: {
-    valeur: "Bonjour {prenom} 👋 Tu t'es inscrit(e) pour : {type} – {date} à {heure} – {lieu}.\nTu confirmes ta présence ? Réponds OUI ou NON (avant {limite}).",
-    description: 'Demande de confirmation en message privé (J-2)',
+    valeur: "Bonjour {prenom} 👋 Tu t'es inscrit(e) pour : {type} – {date} à {heure} – {lieu}.\n👇 Tu confirmes ta présence ? Réponds dans le sondage ci-dessous (avant {limite}).",
+    description: 'Demande de confirmation en message privé (J-2), juste avant le sondage Oui / Non',
   },
   TEXTE_VALIDATION: {
     valeur: '✅ Nous vous confirmons votre participation à : {type} – {date} à {heure} – {lieu}. Merci et à demain !',
@@ -169,6 +171,8 @@ export type NomParametre = keyof typeof PARAMETRES_DEFAUT;
 export const ANCIENNES_VALEURS_PAR_DEFAUT: Partial<Record<NomParametre, string[]>> = {
   // Avant les sondages (20/11/2026), on s'inscrivait en répondant OUI en citant l'annonce.
   TEXTE_ANNONCE: ['📣 {type} – {date} à {heure} – {lieu}\nPour participer, répondez OUI en citant ce message (appui long → Répondre).'],
+  // Avant le sondage de confirmation (21/11/2026), on confirmait en écrivant OUI ou NON.
+  TEXTE_CONFIRMATION: ["Bonjour {prenom} 👋 Tu t'es inscrit(e) pour : {type} – {date} à {heure} – {lieu}.\nTu confirmes ta présence ? Réponds OUI ou NON (avant {limite})."],
 };
 
 /** WhatsApp accepte 12 choix maximum par sondage : 11 créneaux + « pas dispo ». */

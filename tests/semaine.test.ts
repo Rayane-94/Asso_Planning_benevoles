@@ -13,11 +13,13 @@
  *   Ven 20 20:30  📅 récap : Maraude, 2 inscrits
  *   Sam 21 18:00  📣 BP annoncé (sondage à 2 créneaux) ; Bob coche les deux, Alice 14h-16h,
  *                 David (nouveau) 16h-18h
- *   Lun 23 10:00  demandes de confirmation Maraude ; Bob OUI, Alice ne répond pas
+ *   Lun 23 10:00  demandes de confirmation Maraude ; Bob écrit OUI (le texte marche toujours),
+ *                 Alice ne répond pas
  *   Mar 24 20:00  liste Maraude : Bob ; Alice « Sans réponse »
  *   Mar 24 21:00  Bob se désiste en privé → le référent est prévenu
- *   Jeu 26 10:00  demandes de confirmation BP ; Bob OUI, Alice NON, David ne répond pas
- *   Jeu 26 15:00  Emma (nouvelle) vote 16h-18h, en retard → demande immédiate → OUI
+ *   Jeu 26 10:00  demandes de confirmation BP (texte + sondage Oui / Non) ; Bob vote Oui,
+ *                 Alice vote Non, David ne répond pas
+ *   Jeu 26 15:00  Emma (nouvelle) vote 16h-18h, en retard → demande immédiate → vote Oui
  *   Ven 27 20:00  liste BP regroupée par créneau : Bob (sur les deux) et Emma ; David « Sans réponse »
  *   Ven 27 20:30  📅 récap : BP, 2 confirmés (détail par créneau)
  */
@@ -57,13 +59,22 @@ async function ecritEnPrive(env: EnvironnementDeTest, de: string, texte: string)
   await recevoirMessage(env.ctx, env.messagerie.recu({ de, texte }));
 }
 
-/** L'ID de l'annonce publiée pour un type d'action. */
 /** L'ID du sondage publié pour un type d'action (c'est lui que les réponses citent). */
 function annonce(env: EnvironnementDeTest, type: string): string {
   const sondage = env.messagerie.sondages().find((m) => m.texte.startsWith(type));
   if (!sondage) throw new Error(`Sondage ${type} introuvable`);
   return sondage.id;
 }
+
+/** Un bénévole vote dans le sondage de confirmation qu'il a reçu en privé pour ce type d'action. */
+async function voteConfirmation(env: EnvironnementDeTest, de: string, type: string, choix: string): Promise<void> {
+  const sondage = env.messagerie.envoyesA(de).filter((m) => m.sondage && m.texte.startsWith(type)).at(-1);
+  if (!sondage) throw new Error(`Sondage de confirmation ${type} introuvable pour ${de}`);
+  await recevoirVote(env.ctx, env.messagerie.vote({ de, sondage: sondage.id, choix: [choix], groupe: de }));
+}
+
+const OUI = '✅ Oui, je serai là';
+const NON = '❌ Non, je ne peux plus';
 
 const textesA = (env: EnvironnementDeTest, destinataire: string) => env.messagerie.envoyesA(destinataire).map((m) => m.texte);
 
@@ -103,11 +114,11 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
 
     // ----- Jeudi 26 : confirmations du BP -----
     await vivreJusqua(env, '2026-11-26 11:00');
-    await ecritEnPrive(env, BOB, 'oui');
-    await ecritEnPrive(env, ALICE, 'non pas dispo'); // David ne répond pas
+    await voteConfirmation(env, BOB, 'BP', OUI);
+    await voteConfirmation(env, ALICE, 'BP', NON); // David ne répond pas
     await vivreJusqua(env, '2026-11-26 15:00');
     await vote(env, EMMA, 'Emma', bp, [CRENEAU_2]); // en retard
-    await ecritEnPrive(env, EMMA, 'Oui');
+    await voteConfirmation(env, EMMA, 'BP', OUI);
 
     // ----- Vendredi 27 : liste du BP et récap -----
     await vivreJusqua(env, '2026-11-27 21:00');
@@ -135,27 +146,29 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
     expect(textesA(env, BOB)).toEqual([
       'Bienvenue ! Pour la liste des présents, peux-tu me donner ton prénom et ton nom ?',
       "Merci Bob, c'est noté !",
-      "Bonjour Bob 👋 Tu t'es inscrit(e) pour : Maraude – mercredi 25/11 à 19:00 – Gare de Lyon.\nTu confirmes ta présence ? Réponds OUI ou NON (avant mardi 20:00).",
-      "C'est noté, merci !",
+      "Bonjour Bob 👋 Tu t'es inscrit(e) pour : Maraude – mercredi 25/11 à 19:00 – Gare de Lyon.\n👇 Tu confirmes ta présence ? Réponds dans le sondage ci-dessous (avant mardi 20:00).",
+      'Maraude – mercredi 25/11 à 19:00 : tu confirmes ?', // le sondage Oui / Non
+      "C'est noté, merci !", // il a répondu OUI par écrit
       '✅ Nous vous confirmons votre participation à : Maraude – mercredi 25/11 à 19:00 – Gare de Lyon. Merci et à demain !',
       "C'est noté, merci !", // son désistement de mardi soir
-      "Bonjour Bob 👋 Tu t'es inscrit(e) pour : BP – samedi 28/11 à 14:00 – Entrepôt.\nTu confirmes ta présence ? Réponds OUI ou NON (avant vendredi 20:00).\n🕒 Créneau : dispo de 14h à 16h, dispo de 16h à 18h",
-      "C'est noté, merci !",
+      "Bonjour Bob 👋 Tu t'es inscrit(e) pour : BP – samedi 28/11 à 14:00 – Entrepôt.\n👇 Tu confirmes ta présence ? Réponds dans le sondage ci-dessous (avant vendredi 20:00).\n🕒 Créneau : dispo de 14h à 16h, dispo de 16h à 18h",
+      'BP – samedi 28/11 à 14:00 : tu confirmes ?',
+      "C'est noté, merci !", // il a voté Oui
       '✅ Nous vous confirmons votre participation à : BP – samedi 28/11 à 14:00 – Entrepôt. Merci et à demain !\n🕒 Créneau : dispo de 14h à 16h, dispo de 16h à 18h',
     ]);
 
-    // Alice (déjà connue) : jamais de demande de nom ; deux demandes de confirmation, un accusé
-    expect(textesA(env, ALICE).map((t) => t.split(' ')[0])).toEqual(['Bonjour', 'Bonjour', "C'est"]);
+    // Alice (déjà connue) : jamais de demande de nom ; deux demandes (texte + sondage), un accusé
+    expect(textesA(env, ALICE).map((t) => t.split(' ')[0])).toEqual(['Bonjour', 'Maraude', 'Bonjour', 'BP', "C'est"]);
 
     // Chloé : seulement la demande de nom (elle s'est retirée avant les confirmations)
     expect(textesA(env, CHLOE)).toEqual(['Bienvenue ! Pour la liste des présents, peux-tu me donner ton prénom et ton nom ?']);
 
-    // David : demande de nom + demande de confirmation, jamais de « ✅ »
-    expect(textesA(env, DAVID)).toHaveLength(2);
+    // David : demande de nom + demande de confirmation (texte + sondage), jamais de « ✅ »
+    expect(textesA(env, DAVID)).toHaveLength(3);
     expect(textesA(env, DAVID).some((t) => t.startsWith('✅'))).toBe(false);
 
     // Emma (inscrite en retard) : demande immédiate, puis demande de nom, accusé, « ✅ »
-    expect(textesA(env, EMMA).map((t) => t.slice(0, 12))).toEqual(['Bonjour Emma', 'Bienvenue ! ', "C'est noté, ", '✅ Nous vous ']);
+    expect(textesA(env, EMMA).map((t) => t.slice(0, 12))).toEqual(['Bonjour Emma', 'BP – samedi ', 'Bienvenue ! ', "C'est noté, ", '✅ Nous vous ']);
 
     // Le référent : prévenu une seule fois, du désistement de Bob
     expect(textesA(env, REFERENT)).toEqual([

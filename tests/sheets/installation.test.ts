@@ -145,6 +145,20 @@ describe('installerSheet : migration des anciennes valeurs par défaut', () => {
     expect(rapport).toContain('Paramètres mis à jour (ancienne valeur par défaut) : TEXTE_ANNONCE');
   });
 
+  test("l'ancien texte de confirmation (« Réponds OUI ou NON ») est remplacé par celui du sondage, avec les 2 nouveaux choix", async () => {
+    const tableur = new FauxTableur();
+    await installer(tableur);
+    const ligne = (await tableur.lireOnglet(ONGLETS.PARAMETRES)).lignes.find((l) => l.valeurs.Paramètre === 'TEXTE_CONFIRMATION');
+    const ancien = "Bonjour {prenom} 👋 Tu t'es inscrit(e) pour : {type} – {date} à {heure} – {lieu}.\nTu confirmes ta présence ? Réponds OUI ou NON (avant {limite}).";
+    await tableur.modifierLignes(ONGLETS.PARAMETRES, [{ numero: ligne?.numero ?? 0, valeurs: { Valeur: ancien } }]);
+
+    await installer(tableur);
+    const valeur = (nom: string) => tableur.lignes(ONGLETS.PARAMETRES).find((p) => p.Paramètre === nom)?.Valeur;
+    expect(valeur('TEXTE_CONFIRMATION')).toBe(PARAMETRES_DEFAUT.TEXTE_CONFIRMATION.valeur);
+    expect(valeur('OPTION_CONFIRMER_OUI')).toBe('✅ Oui, je serai là');
+    expect(valeur('OPTION_CONFIRMER_NON')).toBe('❌ Non, je ne peux plus');
+  });
+
   test("un texte personnalisé par l'équipe n'est jamais remplacé", async () => {
     const tableur = await avecTexteAnnonce('📣 Hello la team !! {type} le {date}');
     await installer(tableur);

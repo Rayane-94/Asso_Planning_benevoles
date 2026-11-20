@@ -194,6 +194,8 @@ Tu confirmes ta présence ? Réponds OUI ou NON (avant vendredi 20:00).
 
 Le statut passe à **En attente**. Si l'envoi échoue : **Non joignable**.
 
+> **Depuis le 21/11/2026 (S6)** : le texte est suivi d'un **sondage Oui / Non** (« ✅ Oui, je serai là » / « ❌ Non, je ne peux plus »). Voter vaut réponse, sur la bonne action même si on en a plusieurs ; le OUI / NON écrit (règles ci-dessous) reste accepté en secours.
+
 Lecture des réponses en privé :
 
 - si la personne a **une seule** confirmation en attente, « OUI » / « NON » s'y appliquent ;
@@ -412,7 +414,12 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
   - **Décisions (21/11/2026), après le test réel** :
     - **S4 fait** : liste finale au format « titre + liste » (voir §4.5).
     - **S5 fait** : quand « Envoyer les confirmations maintenant » ou « Publier la liste de demain maintenant » n'envoie rien, la colonne Résultat explique pourquoi (`expliquerAucuneConfirmation`, `expliquerAucuneListe`, calculées sur l'état des actions AVANT la commande) : trop tôt (à partir de quelle date), personne d'inscrit, confirmations pas encore parties, liste déjà publiée, prochaine action.
-    - **S6 (prévu)** : demande de confirmation à J-2 = texte + **sondage privé** « ✅ Oui, je serai là » / « ❌ Non, je ne peux plus » (modifiables dans Paramètres) ; le OUI / NON écrit reste accepté en secours ; chaque sondage est lié à une inscription (plus d'ambiguïté « plusieurs demandes »). Sondages en conversation privée **jamais testés en réel** → à vérifier.
+    - **S6 fait** : demande de confirmation à J-2 = texte (`TEXTE_CONFIRMATION`, « 👇 … Réponds dans le sondage ci-dessous ») + 2 s + **sondage privé** « {type} – {date} à {heure} : tu confirmes ? » avec `OPTION_CONFIRMER_OUI` (« ✅ Oui, je serai là ») / `OPTION_CONFIRMER_NON` (« ❌ Non, je ne peux plus »), une seule réponse.
+      - « Demande ID » de l'inscription = ID du **sondage** ; un vote hors du groupe est cherché parmi les Demande ID (`traiterVoteConfirmation` dans `votes.ts`) → pas besoin du numéro (marche même avec un LID), ni de citation quand on a plusieurs demandes.
+      - Mêmes règles que le texte (`appliquerReponse`) : avant la liste, Oui → Confirmé / Non → Désisté (changement d'avis possible) ; accusé seulement si le statut change (pas un message par clic) ; vote retiré → rien. Après la liste : Non d'un Confirmé → désistement tardif + référent (`enregistrerDesistementTardif`) ; le reste → ignoré (info).
+      - Le **OUI / NON écrit reste accepté** en secours. Si le texte part mais pas le sondage : « En attente » avec l'ID du texte (avertissement), la personne répond par écrit.
+      - L'ancien `TEXTE_CONFIRMATION` (« Réponds OUI ou NON ») est remplacé à l'installation s'il n'a pas été personnalisé.
+      - ⚠️ Sondages en **conversation privée jamais testés en réel** (seulement dans un groupe) → à vérifier au prochain test.
 
 ### Améliorations prévues (après la mise en service)
 

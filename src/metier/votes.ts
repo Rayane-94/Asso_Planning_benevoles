@@ -6,13 +6,20 @@
  * cochés par la personne, donc il suffit de regarder « ce qui est coché maintenant » :
  *   - un ou plusieurs créneaux (ou « dispo ») → inscrit(e), avec ces créneaux ;
  *   - « pas dispo », ou plus rien de coché     → retiré(e) (désisté(e) si déjà en confirmation).
+ *
+ * Deux sortes de sondages :
+ *   - le sondage de l'ANNONCE, dans le groupe (ci-dessus) ;
+ *   - le sondage de CONFIRMATION, en privé à J-2 (« Oui, je serai là » / « Non, je ne peux plus »).
  */
-import { STATUT_ACTION } from '../constantes.ts';
+import { REPONSE, STATUT_ACTION, STATUT_INSCRIPTION } from '../constantes.ts';
 import type { VoteRecu } from '../ports/messagerie.ts';
 import { lireActions, type Action } from '../sheets/actions.ts';
+import { lireInscriptions } from '../sheets/inscriptions.ts';
 import { lireParametres, type Parametres } from '../sheets/parametres.ts';
-import { dateLongue } from '../utils/dates.ts';
+import { cleDate, dateLongue } from '../utils/dates.ts';
+import { appliquerReponse, estDemandeOuverte } from './confirmations.ts';
 import type { Contexte } from './contexte.ts';
+import { enregistrerDesistementTardif } from './desistement.ts';
 import { desinscrire, inscrire } from './inscription.ts';
 
 /**
@@ -37,7 +44,11 @@ export async function recevoirVote(ctx: Contexte, vote: VoteRecu): Promise<void>
 }
 
 async function traiterVote(ctx: Contexte, vote: VoteRecu): Promise<void> {
-  if (vote.discussionId !== ctx.groupeId) return; // sondage d'un autre groupe
+  // Pas dans le groupe : c'est peut-être un vote dans un sondage de confirmation (en privé)
+  if (vote.discussionId !== ctx.groupeId) {
+    await traiterVoteConfirmation(ctx, vote);
+    return;
+  }
 
   const { actions } = await lireActions(ctx.tableur);
   const action = actions.find((a) => a.messageId !== '' && a.messageId === vote.sondageId);
@@ -66,6 +77,50 @@ async function traiterVote(ctx: Contexte, vote: VoteRecu): Promise<void> {
   const creneaux = creneauxChoisis(action, vote.choix, parametres);
   if (creneaux === null) await desinscrire(ctx, action, vote.telephone, vote.nomWhatsApp);
   else await inscrire(ctx, action, vote.telephone, vote.nomWhatsApp, creneaux.join(', '));
+}
+
+/**
+ * Vote dans un sondage de CONFIRMATION (J-2, en privé) : « ✅ Oui, je serai là » / « ❌ Non, je ne peux plus ».
+ * Le sondage est retrouvé par son ID, gardé dans la colonne « Demande ID » de l'inscription :
+ * on sait donc à quelle action il répond, même si la personne a plusieurs demandes, et même
+ * si WhatsApp masque son numéro.
+ *   - avant la liste finale : Oui → Confirmé, Non → Désisté (changement d'avis possible) ;
+ *   - après la liste : Non d'un confirmé → désistement de dernière minute (le référent est
+ *     prévenu) ; Oui → rien (les changements se font avec le référent) ;
+ *   - vote retiré (plus rien de coché) : rien ne change.
+ */
+async function traiterVoteConfirmation(ctx: Contexte, vote: VoteRecu): Promise<void> {
+  const { inscriptions } = await lireInscriptions(ctx.tableur);
+  const cible = inscriptions.find((i) => i.demandeId !== '' && i.demandeId === vote.sondageId);
+  if (!cible) return; // sondage inconnu (autre groupe, ancienne demande remplacée…)
+  if (estPlusAncienQueLeDernier(ctx, vote)) return;
+
+  const { parametres } = await lireParametres(ctx.tableur);
+  const reponse = vote.choix.includes(parametres.options.confirmerOui) ? REPONSE.OUI
+    : vote.choix.includes(parametres.options.confirmerNon) ? REPONSE.NON
+      : null;
+  if (reponse === null) {
+    ctx.logger.info(`${cible.nom} a retiré son vote de confirmation pour ${cible.type} du ${dateLongue(cible.date)} : statut inchangé (${cible.statut})`);
+    return;
+  }
+
+  const { actions } = await lireActions(ctx.tableur);
+  const action = actions.find((a) => a.id === cible.actionId);
+  if (!action) return;
+
+  if (action.statut === STATUT_ACTION.CONFIRMATIONS_ENVOYEES && estDemandeOuverte(cible)) {
+    await appliquerReponse(ctx, cible, reponse, { accuserMemeSansChangement: false });
+    return;
+  }
+  const pasEncorePassee = action.date >= cleDate(ctx.horloge.maintenant());
+  if (action.statut === STATUT_ACTION.LISTE_PUBLIEE && pasEncorePassee && reponse === REPONSE.NON && cible.statut === STATUT_INSCRIPTION.CONFIRME) {
+    await enregistrerDesistementTardif(ctx, cible, action);
+    return;
+  }
+  ctx.logger.info(
+    `Vote de confirmation de ${cible.nom} (${reponse}) ignoré : ${action.type} du ${dateLongue(action.date)} est « ${action.statut} », ` +
+    `inscription « ${cible.statut} » (les changements se font avec le référent)`,
+  );
 }
 
 /**
