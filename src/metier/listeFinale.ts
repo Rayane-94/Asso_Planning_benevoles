@@ -4,9 +4,11 @@
  * Pour chaque action « Confirmations envoyées » qui a lieu demain :
  *   1. « En attente » → « Sans réponse » (ils iront dans l'onglet Absents) ;
  *   2. l'action passe à « Liste publiée » (plus aucun changement automatique ensuite) ;
- *   3. liste des confirmés dans le groupe, une ligne par personne :
- *        BP – 28/11 – Durand Bob – 06 12 34 56 78
- *      ou, si personne : ⚠️ BP – 28/11 : personne n'a confirmé…
+ *   3. liste des confirmés dans le groupe : un titre, puis une ligne par personne
+ *        📋 BP – samedi 28/11 à 14:00 – Entrepôt
+ *        • Durand Bob – 06 12 34 56 78
+ *      avec des créneaux : un bloc « 🕒 dispo de 10h à 13h » par créneau, les présents en dessous ;
+ *      si personne : ⚠️ BP – 28/11 : personne n'a confirmé…
  *   4. message privé « ✅ Nous vous confirmons votre participation… » à chaque confirmé.
  *
  * Anti-doublon : le statut « Liste publiée » est écrit AVANT l'envoi de la liste. Si l'envoi
@@ -18,14 +20,15 @@
 import {
   HEURE_DEBUT_ENVOIS_AUTO, HEURE_FIN_ENVOIS_AUTO, PAUSE_ENTRE_MESSAGES_MS, STATUT_ACTION, STATUT_INSCRIPTION,
 } from '../constantes.ts';
-import { modifierAction, type Action } from '../sheets/actions.ts';
+import { lireCreneaux, modifierAction, type Action } from '../sheets/actions.ts';
 import { lireBenevoles, prenomPourMessage, type Benevole } from '../sheets/benevoles.ts';
 import { lireInscriptions, modifierInscriptions, type Inscription } from '../sheets/inscriptions.ts';
 import type { Parametres } from '../sheets/parametres.ts';
-import { cleDate, dateCourte, dateLongue, ecartJours, heureDe } from '../utils/dates.ts';
+import { ajouterJours, cleDate, dateCourte, dateLongue, ecartJours, heureDe } from '../utils/dates.ts';
 import { formaterTelephone } from '../utils/telephones.ts';
 import { remplirModele } from '../utils/textes.ts';
 import { estDansLaFenetre } from './annonces.ts';
+import { avecCreneau, decrire } from './confirmations.ts';
 import type { Contexte, DonneesDuTick } from './contexte.ts';
 
 export type ModeListe = 'automatique' | 'commande';
@@ -57,6 +60,36 @@ export async function publierListes(ctx: Contexte, donnees: DonneesDuTick, mode:
     if (await publierUneListe(ctx, ctx.groupeId, action, deCetteAction, parTelephone, parametres)) publiees++;
   }
   return publiees;
+}
+
+/**
+ * Pourquoi la commande « Publier la liste de demain maintenant » n'a rien publié
+ * (texte de la colonne Résultat). À appeler AVANT, avec les actions telles qu'elles étaient.
+ *   ex. « BP (22/11) : les demandes de confirmation ne sont pas encore parties… »
+ */
+export function expliquerAucuneListe(actions: Action[], aujourdhui: string): string {
+  const S = STATUT_ACTION;
+  const proches = actions
+    .filter((a) => a.statut !== S.ANNULEE && [0, 1].includes(ecartJours(aujourdhui, a.date)))
+    .sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+
+  if (proches.length === 0) {
+    const prochaine = actions
+      .filter((a) => a.statut !== S.ANNULEE && a.statut !== S.LISTE_PUBLIEE && ecartJours(aujourdhui, a.date) > 1)
+      .sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure))[0];
+    const suite = prochaine
+      ? ` (prochaine : ${decrire(prochaine)}, liste possible à partir du ${dateCourte(ajouterJours(prochaine.date, -1))})`
+      : '';
+    return `aucune action aujourd'hui ni demain${suite}`;
+  }
+  return proches.map((a) => {
+    switch (a.statut) {
+      case S.LISTE_PUBLIEE: return `${decrire(a)} : liste déjà publiée`;
+      case S.A_ANNONCER: return `${decrire(a)} : pas encore annoncée`;
+      case S.ANNONCEE: return `${decrire(a)} : les demandes de confirmation ne sont pas encore parties (lancer d'abord « Envoyer les confirmations maintenant »)`;
+      default: return `${decrire(a)} : non publiée, voir le Journal`;
+    }
+  }).join(' ; ');
 }
 
 /** Les actions dont il faut publier la liste maintenant (exportée pour les tests). */
@@ -111,10 +144,10 @@ async function publierUneListe(
   // 4) Confirmation finale en privé à chaque confirmé (un échec n'empêche pas les autres)
   for (const inscription of confirmes) {
     await ctx.horloge.attendre(PAUSE_ENTRE_MESSAGES_MS);
-    const texte = remplirModele(parametres.textes.validation, {
+    const texte = avecCreneau(remplirModele(parametres.textes.validation, {
       type: action.type, date: dateLongue(action.date), heure: action.heure, lieu: action.lieu,
       prenom: prenomPourMessage(benevoles.get(inscription.telephone) ?? { prenom: '', nomWhatsApp: '' }),
-    });
+    }), inscription.creneau);
     try {
       await ctx.messagerie.envoyerTexte(inscription.telephone, texte);
     } catch (erreur) {
@@ -125,17 +158,41 @@ async function publierUneListe(
 }
 
 /**
- * Le texte de la liste, au format volontairement minimaliste (une ligne par présent).
+ * Le texte de la liste (format « titre + liste », choisi le 21/11/2026) :
+ *
+ *   📋 BP – samedi 28/11 à 10:00 – Entrepôt      (titre)
+ *
+ *   🕒 dispo de 10h à 13h                        (un bloc par créneau, ordre du sondage ;
+ *   • Durand Bob – 06 12 34 56 78                 une personne sur deux créneaux est dans les deux)
+ *
+ *   🕒 dispo de 13h à 16h
+ *   ⚠️ personne                                   (créneau sans aucun confirmé)
+ *
+ * Sans créneaux : le titre puis directement les « • Nom – téléphone ».
  * Exportée pour les tests.
  */
 export function texteListe(action: Action, confirmes: Inscription[]): string {
-  const jour = dateCourte(action.date);
   if (confirmes.length === 0) {
-    return `⚠️ ${action.type} – ${jour} : personne n'a confirmé. Si tu peux venir, contacte le référent.`;
+    return `⚠️ ${action.type} – ${dateCourte(action.date)} : personne n'a confirmé. Si tu peux venir, contacte le référent.`;
   }
-  return confirmes
-    .map((inscription) => `${action.type} – ${jour} – ${inscription.nom} – ${formaterTelephone(inscription.telephone)}`)
-    .join('\n');
+  const lieu = action.lieu ? ` – ${action.lieu}` : '';
+  const titre = `📋 ${action.type} – ${dateLongue(action.date)} à ${action.heure}${lieu}`;
+  const puces = (personnes: Inscription[]) =>
+    personnes.map((inscription) => `• ${inscription.nom} – ${formaterTelephone(inscription.telephone)}`);
+
+  // Sans créneaux : le titre, puis une ligne par présent.
+  if (action.creneaux.length === 0) return [titre, ...puces(confirmes)].join('\n');
+
+  // Avec créneaux : un bloc par créneau, dans l'ordre du sondage (une personne peut être dans plusieurs).
+  const blocs = action.creneaux.map((creneau) => {
+    const presents = confirmes.filter((inscription) => lireCreneaux(inscription.creneau).includes(creneau));
+    return [`🕒 ${creneau}`, ...(presents.length > 0 ? puces(presents) : ['⚠️ personne'])].join('\n');
+  });
+  // Confirmés sans créneau reconnu (ex. créneau renommé dans Actions après le vote) : listés quand même, à la fin.
+  const autres = confirmes.filter((inscription) => !lireCreneaux(inscription.creneau).some((c) => action.creneaux.includes(c)));
+  if (autres.length > 0) blocs.push(['🕒 autre créneau', ...autres.map((i) => `• ${i.nom} – ${formaterTelephone(i.telephone)}${i.creneau ? ` (${i.creneau})` : ''}`)].join('\n'));
+
+  return [titre, ...blocs].join('\n\n');
 }
 
 /**

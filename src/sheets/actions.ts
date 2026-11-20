@@ -5,9 +5,10 @@
  * Statut et Message ID. Une ligne incomplète (le référent est peut-être en train de
  * la taper) n'est pas une erreur : elle est simplement mise de côté avec sa raison.
  */
-import { ONGLETS, STATUT_ACTION, type StatutAction } from '../constantes.ts';
+import { CRENEAUX_MAX, ONGLETS, STATUT_ACTION, type StatutAction } from '../constantes.ts';
 import type { Tableur, Valeurs } from '../ports/tableur.ts';
 import { lireDate, parseHeure, type CleDate, type Heure } from '../utils/dates.ts';
+import { normaliserPourDetection } from '../utils/textes.ts';
 import { prochainId } from './ids.ts';
 import { COLONNES_ACTIONS } from './schema.ts';
 
@@ -22,6 +23,11 @@ export interface Action {
   date: CleDate;
   heure: Heure;
   lieu: string;
+  /**
+   * Créneaux proposés dans le sondage (ex. ['dispo de 10h à 13h', 'dispo de 13h à 16h']).
+   * Vide = sondage simple « dispo » / « pas dispo ».
+   */
+  creneaux: string[];
   /** Nombre de places, facultatif (texte libre, non utilisé pour l'instant). */
   places: string;
   statut: StatutAction;
@@ -58,6 +64,7 @@ export async function lireActions(tableur: Tableur): Promise<LectureActions> {
       date: lireDate(valeurs[A.DATE]) as CleDate, // vérifié par verifierLigne
       heure: parseHeure(valeurs[A.HEURE]) as Heure, // idem
       lieu: valeurs[A.LIEU].trim(),
+      creneaux: creneauxDeLAction(valeurs[A.CRENEAUX] ?? ''), // ?? '' : colonne absente si le Sheet n'est pas réinstallé
       places: valeurs[A.PLACES].trim(),
       statut: valeurs[A.STATUT].trim() as StatutAction, // idem
       messageId: valeurs[A.MESSAGE_ID].trim(),
@@ -74,7 +81,32 @@ function verifierLigne(valeurs: Valeurs): string | null {
   if (parseHeure(valeurs[A.HEURE]) === null) return `heure illisible « ${valeurs[A.HEURE]} » (attendu : 14:00 ou 14h)`;
   const statuts: string[] = Object.values(STATUT_ACTION);
   if (!statuts.includes(valeurs[A.STATUT].trim())) return `statut inconnu « ${valeurs[A.STATUT]} »`;
+  const creneaux = creneauxDeLAction(valeurs[A.CRENEAUX] ?? '');
+  if (creneaux.length > CRENEAUX_MAX) {
+    return `trop de créneaux (${creneaux.length}) : WhatsApp accepte ${CRENEAUX_MAX} créneaux maximum dans un sondage`;
+  }
+  if (new Set(creneaux).size !== creneaux.length) return 'deux créneaux identiques (WhatsApp refuse les choix en double)';
   return null;
+}
+
+/** « dispo de 10h à 13h, dispo de 13h à 16h » → ['dispo de 10h à 13h', 'dispo de 13h à 16h'] (vide → []) */
+export function lireCreneaux(texte: string): string[] {
+  return texte.split(',').map((creneau) => creneau.trim()).filter((creneau) => creneau !== '');
+}
+
+/**
+ * Les créneaux de la colonne Créneaux d'une action, SANS ceux qui veulent dire « pas dispo ».
+ * Le bot ajoute toujours lui-même « pas dispo » à la fin du sondage ; si le référent l'écrit
+ * aussi dans Créneaux, ce n'est pas un créneau : un vote pour lui doit retirer la personne,
+ * pas l'inscrire (bug vu au test réel du 20/11/2026).
+ */
+function creneauxDeLAction(texte: string): string[] {
+  return lireCreneaux(texte).filter((creneau) => !veutDirePasDispo(creneau));
+}
+
+/** « pas dispo », « Pas dispo :/ », « indispo », « non disponible »… → true */
+export function veutDirePasDispo(creneau: string): boolean {
+  return /^(pas|non|in) ?dispo/.test(normaliserPourDetection(creneau));
 }
 
 /**

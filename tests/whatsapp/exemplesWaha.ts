@@ -110,6 +110,51 @@ export const statutSession = {
   payload: { name: 'default', status: 'WORKING' },
 };
 
+/** ID court du sondage de l'annonce (spike sondages du 20/11/2026). */
+export const ID_SONDAGE = '3EB06AE4D1C2B3A4F5E6D7C8';
+
+/**
+ * Le bénévole vote dans le sondage. Chaque vote donne TOUS ses choix du moment
+ * (ici il coche les deux créneaux) ; [] = vote retiré.
+ */
+export const voteSondage = {
+  ...enveloppe,
+  id: 'evt_10',
+  timestamp: 1795200000000,
+  event: 'poll.vote',
+  payload: {
+    vote: {
+      id: `false_${GROUPE}_ACVOTE0000000000000000000000001_${BENEVOLE.lid}`,
+      to: GROUPE,
+      from: GROUPE,
+      fromMe: false,
+      participant: BENEVOLE.lid,
+      selectedOptions: ['dispo de 10h à 13h', 'dispo de 13h à 16h'],
+      timestamp: 1795200000,
+    },
+    poll: {
+      id: `true_${GROUPE}_${ID_SONDAGE}_${BOT.lid}`,
+      to: GROUPE,
+      from: GROUPE,
+      fromMe: true,
+    },
+    _data: {
+      Info: {
+        Chat: GROUPE,
+        Sender: BENEVOLE.lid,
+        IsFromMe: false,
+        IsGroup: true,
+        AddressingMode: 'lid',
+        SenderAlt: `${BENEVOLE.numero}@s.whatsapp.net`,
+        ID: 'ACVOTE0000000000000000000000001',
+        Type: 'poll',
+        PushName: BENEVOLE.nom,
+      },
+      Message: { pollUpdateMessage: { pollCreationMessageKey: { ID: ID_SONDAGE, FromMe: true, RemoteJID: GROUPE } } },
+    },
+  },
+};
+
 /** Copie profonde modifiable d'un exemple (pour fabriquer des variantes dans les tests). */
 export function copie<T>(exemple: T): T {
   return structuredClone(exemple);

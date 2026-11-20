@@ -31,8 +31,9 @@ services:
       # vu depuis le conteneur : c'est là que tourne le bot (ou le script de spike) sur le port 3000.
       WHATSAPP_HOOK_URL: ${WAHA_WEBHOOK_URL:-http://host.docker.internal:3000/webhook/waha}
       # message = les messages REÇUS (pas ceux envoyés par le bot lui-même) ;
-      # session.status = connexion / déconnexion de WhatsApp.
-      WHATSAPP_HOOK_EVENTS: message,session.status
+      # session.status = connexion / déconnexion de WhatsApp ;
+      # poll.vote / poll.vote.failed = votes dans les sondages (et votes illisibles).
+      WHATSAPP_HOOK_EVENTS: message,session.status,poll.vote,poll.vote.failed
     volumes:
       # La session WhatsApp est gardée ici : sans ça, il faudrait rescanner le QR code à chaque redémarrage.
       - ./data/waha-sessions:/app/.sessions

@@ -10,7 +10,7 @@
  *   });
  *   await traiterMessage(reponse);                          // le bot traite la réponse
  */
-import type { EtatConnexion, Groupe, MessageRecu, Messagerie } from '../../src/ports/messagerie.ts';
+import type { EtatConnexion, Groupe, MessageRecu, Messagerie, VoteRecu } from '../../src/ports/messagerie.ts';
 import type { Horloge } from '../../src/ports/horloge.ts';
 
 /** ID du groupe WhatsApp de test. */
@@ -22,9 +22,12 @@ export const NUMERO_BOT = '33700000000';
 export interface MessageEnvoye {
   id: string;
   destinataire: string;
+  /** Le texte du message, ou la question du sondage. */
   texte: string;
   citeId: string | null;
   date: Date;
+  /** Présent seulement si c'est un sondage. */
+  sondage?: { choix: string[]; plusieursChoix: boolean };
 }
 
 /** Ce qu'il faut pour fabriquer un message reçu. */
@@ -42,6 +45,19 @@ export interface DescriptionMessageRecu {
   id?: string;
 }
 
+/** Ce qu'il faut pour fabriquer un vote. */
+export interface DescriptionVote {
+  /** Numéro de la personne qui vote ; null pour simuler un numéro masqué. */
+  de: string | null;
+  /** ID du sondage (celui renvoyé par envoyerSondage). */
+  sondage: string;
+  /** Tous les choix cochés après ce vote ; [] = vote retiré. */
+  choix: string[];
+  nom?: string;
+  groupe?: string;
+  id?: string;
+}
+
 export class FausseMessagerie implements Messagerie {
   /** Tous les messages envoyés par le bot, dans l'ordre. */
   readonly envoyes: MessageEnvoye[] = [];
@@ -52,6 +68,8 @@ export class FausseMessagerie implements Messagerie {
   private compteur = 0;
   private connectee = true;
   private readonly destinatairesEnEchec = new Set<string>();
+  /** true = les envois de SONDAGES échouent (les textes passent) : pour tester un envoi à moitié réussi. */
+  sondagesEnEchec = false;
 
   constructor(horloge: Horloge) {
     this.horloge = horloge;
@@ -64,6 +82,17 @@ export class FausseMessagerie implements Messagerie {
     if (this.destinatairesEnEchec.has(destinataire)) throw new Error(`Envoi impossible vers ${destinataire}`);
     const id = `envoye-${++this.compteur}`;
     this.envoyes.push({ id, destinataire, texte, citeId: options.citeId ?? null, date: this.horloge.maintenant() });
+    return id;
+  }
+
+  async envoyerSondage(destinataire: string, question: string, choix: string[], plusieursChoix: boolean): Promise<string> {
+    if (!this.connectee) throw new Error('WhatsApp déconnecté');
+    if (this.destinatairesEnEchec.has(destinataire)) throw new Error(`Envoi impossible vers ${destinataire}`);
+    if (this.sondagesEnEchec) throw new Error('Envoi du sondage impossible (simulation de test)');
+    const id = `sondage-${++this.compteur}`;
+    this.envoyes.push({
+      id, destinataire, texte: question, citeId: null, date: this.horloge.maintenant(), sondage: { choix: [...choix], plusieursChoix },
+    });
     return id;
   }
 
@@ -95,9 +124,37 @@ export class FausseMessagerie implements Messagerie {
     };
   }
 
+  /**
+   * Fabrique un vote dans un sondage (à passer ensuite à recevoirVote).
+   * `choix` = TOUS les choix cochés après ce vote (comme WhatsApp) ; [] = vote retiré.
+   */
+  vote({ de, sondage, choix, nom = '', groupe = GROUPE_TEST, id }: DescriptionVote): VoteRecu {
+    const idBrut = de ?? `lid-${++this.compteur}`;
+    return {
+      id: id ?? `vote-${++this.compteur}`,
+      sondageId: sondage,
+      discussionId: groupe,
+      telephone: de,
+      idBrut,
+      nomWhatsApp: nom,
+      choix: [...choix],
+      date: this.horloge.maintenant(),
+    };
+  }
+
   /** Messages envoyés à un destinataire (numéro ou ID de groupe). */
   envoyesA(destinataire: string): MessageEnvoye[] {
     return this.envoyes.filter((message) => message.destinataire === destinataire);
+  }
+
+  /** Les sondages envoyés (dans l'ordre). */
+  sondages(): MessageEnvoye[] {
+    return this.envoyes.filter((message) => message.sondage !== undefined);
+  }
+
+  /** Les messages envoyés qui ne sont PAS des sondages. */
+  textes(): MessageEnvoye[] {
+    return this.envoyes.filter((message) => message.sondage === undefined);
   }
 
   /** Le dernier message envoyé (erreur claire s'il n'y en a aucun). */

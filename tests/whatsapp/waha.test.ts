@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
-  convertirWebhook, idCourt, MessagerieWaha, telephoneDepuisIdentifiant, versChatId, type Fetch,
+  convertirWebhook, convertirWebhookVote, idCourt, MessagerieWaha, telephoneDepuisIdentifiant, versChatId, type Fetch,
 } from '../../src/whatsapp/waha.ts';
 import {
-  BENEVOLE, copie, GROUPE, ID_ANNONCE, messageDuBot, messagePrive, reponseCiteeDansLeGroupe, statutSession,
+  BENEVOLE, copie, GROUPE, ID_ANNONCE, ID_SONDAGE, messageDuBot, messagePrive, reponseCiteeDansLeGroupe, statutSession,
+  voteSondage,
 } from './exemplesWaha.ts';
 
 describe('convertirWebhook : du JSON de WAHA vers un MessageRecu', () => {
@@ -54,6 +55,58 @@ describe('convertirWebhook : du JSON de WAHA vers un MessageRecu', () => {
     const photo = copie(messagePrive);
     photo.payload.body = '';
     expect(convertirWebhook(photo)).toBeNull();
+  });
+});
+
+describe('convertirWebhookVote : du JSON de WAHA vers un VoteRecu', () => {
+  test('vote dans le sondage : ID court du sondage, vrai numéro (SenderAlt), choix en clair', () => {
+    expect(convertirWebhookVote(voteSondage)).toEqual({
+      id: 'ACVOTE0000000000000000000000001',
+      sondageId: ID_SONDAGE,
+      discussionId: GROUPE,
+      telephone: BENEVOLE.numero,
+      idBrut: BENEVOLE.lid,
+      nomWhatsApp: BENEVOLE.nom,
+      choix: ['dispo de 10h à 13h', 'dispo de 13h à 16h'],
+      date: new Date(1795200000 * 1000),
+    });
+  });
+
+  test('vote retiré : choix = []', () => {
+    const retire = copie(voteSondage);
+    retire.payload.vote.selectedOptions = [];
+    expect(convertirWebhookVote(retire)?.choix).toEqual([]);
+  });
+
+  test('sans payload.poll : l\'ID du sondage est pris dans le message de vote', () => {
+    const variante = copie(voteSondage);
+    delete (variante.payload as Partial<typeof variante.payload>).poll;
+    expect(convertirWebhookVote(variante)?.sondageId).toBe(ID_SONDAGE);
+  });
+
+  test('numéro masqué (pas de SenderAlt) : telephone = null', () => {
+    const sansNumero = copie(voteSondage);
+    delete (sansNumero.payload._data.Info as Partial<typeof sansNumero.payload._data.Info>).SenderAlt;
+    expect(convertirWebhookVote(sansNumero)?.telephone).toBeNull();
+  });
+
+  test('horodatage en millisecondes : accepté aussi', () => {
+    const variante = copie(voteSondage);
+    variante.payload.vote.timestamp = 1795200000123;
+    expect(convertirWebhookVote(variante)?.date).toEqual(new Date(1795200000123));
+  });
+
+  test.each([
+    ['un vote du bot lui-même (fromMe)', (() => { const v = copie(voteSondage); v.payload.vote.fromMe = true; return v; })()],
+    ['un message (pas un vote)', reponseCiteeDansLeGroupe],
+    ['un changement d\'état de session', statutSession],
+    ['rien du tout', null],
+  ])('ignore %s', (_cas, evenement) => {
+    expect(convertirWebhookVote(evenement)).toBeNull();
+  });
+
+  test('un vote n\'est jamais pris pour un message', () => {
+    expect(convertirWebhook(voteSondage)).toBeNull();
   });
 });
 
@@ -111,6 +164,21 @@ describe('MessagerieWaha (avec un faux WAHA)', () => {
       url: '/api/sendText', methode: 'POST', cle: 'cle-de-test',
       corps: { session: 'default', chatId: GROUPE, text: '📣 BP – samedi 28/11' },
     }]);
+  });
+
+  test('envoyerSondage : requête au format du spike (poll.name / options / multipleAnswers), renvoie l\'ID COURT', async () => {
+    const { messagerie, appels } = fauxWaha({
+      '/api/sendPoll': { status: 201, corps: { id: `true_${GROUPE}_3EB06AE4FF8398BBED51EC_33700000001@c.us` } },
+    });
+    const id = await messagerie.envoyerSondage(GROUPE, 'BP – samedi 28/11 à 14:00', ['dispo de 10h à 13h', 'pas dispo :/'], true);
+    expect(id).toBe('3EB06AE4FF8398BBED51EC');
+    expect(appels[0]).toEqual({
+      url: '/api/sendPoll', methode: 'POST', cle: 'cle-de-test',
+      corps: {
+        session: 'default', chatId: GROUPE,
+        poll: { name: 'BP – samedi 28/11 à 14:00', options: ['dispo de 10h à 13h', 'pas dispo :/'], multipleAnswers: true },
+      },
+    });
   });
 
   test('envoyerTexte vers un numéro : converti en …@c.us', async () => {

@@ -19,17 +19,54 @@ async function annoncer(env: EnvironnementDeTest, mode: 'automatique' | 'command
 }
 
 describe('annonce J-7 : le cas normal', () => {
-  test('samedi 21 à 18:00 : le BP du samedi 28 est annoncé dans le groupe', async () => {
+  test('samedi 21 à 18:00 : le BP du samedi 28 est annoncé dans le groupe — un texte, puis le sondage', async () => {
     const env = await contexteDeTest('2026-11-21 18:00');
     await ajouterAction(env, BP_SAMEDI_28);
     await env.planificateur.tick();
 
-    const annonce = env.messagerie.dernierEnvoi();
-    expect(annonce.destinataire).toBe(GROUPE_TEST);
-    expect(annonce.texte).toBe(
+    const [texte, sondage] = env.messagerie.envoyesA(GROUPE_TEST);
+    expect(texte.texte).toBe(
       '📣 BP – samedi 28/11 à 14:00 – Entrepôt\n' +
-      'Pour participer, répondez OUI en citant ce message (appui long → Répondre).',
+      '👇 Votez dans le sondage ci-dessous pour participer.',
     );
+    expect(sondage).toMatchObject({
+      texte: 'BP – samedi 28/11 à 14:00',
+      sondage: { choix: ['dispo !!', 'pas dispo :/'], plusieursChoix: false },
+    });
+    expect(env.horloge.pauses).toEqual([2000]); // 2 s entre le texte et le sondage
+  });
+
+  test('avec des créneaux : un choix par créneau + « pas dispo », plusieurs réponses possibles', async () => {
+    const env = await contexteDeTest('2026-11-21 18:00');
+    await ajouterAction(env, { ...BP_SAMEDI_28, Créneaux: 'dispo de 10h à 13h, dispo de 13h à 16h' });
+    await env.planificateur.tick();
+    expect(env.messagerie.sondages()[0].sondage).toEqual({
+      choix: ['dispo de 10h à 13h', 'dispo de 13h à 16h', 'pas dispo :/'],
+      plusieursChoix: true,
+    });
+  });
+
+  test('les libellés « dispo » / « pas dispo » viennent des Paramètres', async () => {
+    const env = await contexteDeTest('2026-11-21 18:00');
+    await changerParametre(env.tableur, 'OPTION_DISPO', 'je viens 🙋');
+    await changerParametre(env.tableur, 'OPTION_PAS_DISPO', 'pas cette fois');
+    await ajouterAction(env, BP_SAMEDI_28);
+    await env.planificateur.tick();
+    expect(env.messagerie.sondages()[0].sondage?.choix).toEqual(['je viens 🙋', 'pas cette fois']);
+  });
+
+  test("le texte part mais pas le sondage : pas de renvoi automatique (le texte serait en double), erreur claire", async () => {
+    const env = await contexteDeTest('2026-11-21 18:00');
+    await ajouterAction(env, BP_SAMEDI_28);
+    env.messagerie.sondagesEnEchec = true;
+    await env.planificateur.tick();
+    env.messagerie.sondagesEnEchec = false;
+    env.horloge.avancer({ minutes: 1 });
+    await env.planificateur.tick();
+
+    expect(env.messagerie.textes()).toHaveLength(1); // le texte n'est PAS renvoyé
+    expect(env.tableur.lignes('Actions')[0]['Message ID']).toBe('envoi-en-cours');
+    expect(logsDeNiveau(env, 'ERREUR')[0]).toContain('le texte est parti mais PAS le sondage');
   });
 
   test("l'action passe à « Annoncée » et l'ID du message est gardé (pour reconnaître les réponses)", async () => {
@@ -50,7 +87,7 @@ describe('annonce J-7 : le cas normal', () => {
 
     env.horloge.avancer({ minutes: 1 });
     await env.planificateur.tick();
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
   });
 
   test('action à J+8 : pas encore ; le lendemain à 18:00 : annoncée', async () => {
@@ -61,7 +98,7 @@ describe('annonce J-7 : le cas normal', () => {
 
     env.horloge.avancer({ jours: 1 });
     await env.planificateur.tick();
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
   });
 
   test('HEURE_ANNONCE modifiée par l\'équipe : respectée', async () => {
@@ -72,7 +109,7 @@ describe('annonce J-7 : le cas normal', () => {
     expect(env.messagerie.envoyes).toHaveLength(0);
     env.horloge.regler('2026-11-21 19:00');
     await env.planificateur.tick();
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
   });
 });
 
@@ -86,7 +123,7 @@ describe('jamais de doublon', () => {
     }
     env.horloge.avancer({ jours: 1 });
     await env.planificateur.tick();
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
   });
 
   test('envoi interrompu (marqueur « envoi-en-cours ») : pas de renvoi, avertissement pour un humain', async () => {
@@ -120,7 +157,7 @@ describe('jamais de doublon', () => {
     env.messagerie.reconnecter();
     env.horloge.avancer({ minutes: 1 });
     await env.planificateur.tick();
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
     expect(env.tableur.lignes('Actions')[0].Statut).toBe('Annoncée');
   });
 });
@@ -197,12 +234,13 @@ describe('plusieurs annonces le même soir', () => {
     await env.planificateur.tick();
 
     expect(env.messagerie.envoyes.map((m) => m.texte.split('\n')[0])).toEqual([
-      '📣 Maraude – mercredi 25/11 à 19:00 – Gare de Lyon',
-      '📣 BP – samedi 28/11 à 09:00 – Entrepôt',
-      '📣 Collecte – samedi 28/11 à 10:00 – Supermarché',
+      '📣 Maraude – mercredi 25/11 à 19:00 – Gare de Lyon', 'Maraude – mercredi 25/11 à 19:00',
+      '📣 BP – samedi 28/11 à 09:00 – Entrepôt', 'BP – samedi 28/11 à 09:00',
+      '📣 Collecte – samedi 28/11 à 10:00 – Supermarché', 'Collecte – samedi 28/11 à 10:00',
     ]);
-    expect(env.horloge.pauses).toEqual([2000, 2000]);
-    // Chaque action a son propre message (et donc son propre ID)
+    // 2 s entre chaque message : texte → sondage → texte → sondage…
+    expect(env.horloge.pauses).toEqual([2000, 2000, 2000, 2000, 2000]);
+    // Chaque action a son propre sondage (et donc son propre ID)
     expect(new Set(env.tableur.lignes('Actions').map((l) => l['Message ID'])).size).toBe(3);
   });
 });

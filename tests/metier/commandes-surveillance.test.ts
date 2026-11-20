@@ -25,9 +25,10 @@ describe('onglet Commandes', () => {
     await cocher(env, 'Annoncer maintenant');
     await env.planificateur.tick();
 
-    expect(env.messagerie.envoyesA(GROUPE_TEST)).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
     expect(commande(env, 'Annoncer maintenant')).toMatchObject({
-      Lancer: '', 'Dernière exécution': '2026-11-21 09:00:00', Résultat: '1 annonce(s) publiée(s)',
+      // (quelques secondes après 09:00 : les 2 s entre le texte et le sondage)
+      Lancer: '', 'Dernière exécution': expect.stringMatching(/^2026-11-21 09:00/), Résultat: '1 annonce(s) publiée(s)',
     });
   });
 
@@ -40,6 +41,57 @@ describe('onglet Commandes', () => {
     expect(commande(env, 'Annoncer maintenant')?.Résultat).toBe(
       'Aucune annonce publiée : A-0001 (28/11) : trop loin, annonce possible à partir du 21/11',
     );
+  });
+
+  describe('quand une commande n\'envoie rien, le résultat explique POURQUOI (test réel du 21/11)', () => {
+    /** Samedi 21/11 juste après minuit, comme au test réel ; une action déjà dans le Sheet. */
+    async function apres(minuit: Record<string, string>, nomCommande: string): Promise<string | undefined> {
+      const env = await contexteDeTest('2026-11-21 00:01');
+      await ajouterAction(env, { Type: 'BP', Heure: '10:00', Lieu: 'Entrepôt', 'Message ID': 'sondage-bp', ...minuit });
+      await cocher(env, nomCommande);
+      await env.planificateur.tick();
+      expect(env.messagerie.envoyes).toEqual([]);
+      return commande(env, nomCommande)?.Résultat;
+    }
+    const CONFIRMATIONS = 'Envoyer les confirmations maintenant';
+    const LISTE = 'Publier la liste de demain maintenant';
+
+    test('confirmations, action trop loin (J+3) : à partir de quand', async () => {
+      expect(await apres({ Date: '24/11/2026', Statut: 'Annoncée' }, CONFIRMATIONS)).toBe(
+        'Aucune demande envoyée : BP (24/11) : trop tôt, demandes possibles à partir du 22/11',
+      );
+    });
+
+    test('confirmations, action dans la période mais personne d\'inscrit', async () => {
+      expect(await apres({ Date: '23/11/2026', Statut: 'Annoncée' }, CONFIRMATIONS)).toBe(
+        'Aucune demande envoyée : BP (23/11) : aucun bénévole « Inscrit » à qui écrire (personne n\'a voté, ou demandes déjà envoyées)',
+      );
+    });
+
+    test('confirmations, rien d\'annoncé', async () => {
+      expect(await apres({ Date: '23/11/2026', Statut: 'Confirmations envoyées' }, CONFIRMATIONS)).toBe(
+        'Aucune demande envoyée : aucune action « Annoncée » à venir (rien n\'est annoncé, ou les demandes sont déjà parties)',
+      );
+    });
+
+    test('liste, action de demain dont les confirmations ne sont pas parties : que faire', async () => {
+      expect(await apres({ Date: '22/11/2026', Statut: 'Annoncée' }, LISTE)).toBe(
+        'Aucune liste publiée : BP (22/11) : les demandes de confirmation ne sont pas encore parties ' +
+        '(lancer d\'abord « Envoyer les confirmations maintenant »)',
+      );
+    });
+
+    test('liste, rien aujourd\'hui ni demain : la prochaine et à partir de quand', async () => {
+      expect(await apres({ Date: '24/11/2026', Statut: 'Confirmations envoyées' }, LISTE)).toBe(
+        'Aucune liste publiée : aucune action aujourd\'hui ni demain (prochaine : BP (24/11), liste possible à partir du 23/11)',
+      );
+    });
+
+    test('liste déjà publiée', async () => {
+      expect(await apres({ Date: '22/11/2026', Statut: 'Liste publiée' }, LISTE)).toBe(
+        'Aucune liste publiée : BP (22/11) : liste déjà publiée',
+      );
+    });
   });
 
   test('les lignes vides de l\'onglet Commandes (case à cocher seule) sont ignorées', async () => {
@@ -57,7 +109,7 @@ describe('onglet Commandes', () => {
     env.horloge.avancer({ minutes: 1 });
     await env.planificateur.tick();
     expect(commande(env, 'Annoncer maintenant')?.Résultat).toBe('1 annonce(s) publiée(s)');
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
   });
 
   test.each(['TRUE', 'VRAI', 'true'])('case cochée lue comme « %s » (selon la langue du Sheet)', (valeur) => {
@@ -110,7 +162,7 @@ describe('pause', () => {
     await cocher(env, 'Reprendre');
     await env.planificateur.tick();
     expect(etat(env, 'Bot')?.État).toBe('🟢 Actif');
-    expect(env.messagerie.envoyes).toHaveLength(1); // annoncé dans le même tick
+    expect(env.messagerie.sondages()).toHaveLength(1); // annoncé dans le même tick
   });
 
   test('en pause, les commandes manuelles marchent toujours', async () => {
@@ -120,7 +172,7 @@ describe('pause', () => {
     await env.planificateur.tick();
     await cocher(env, 'Annoncer maintenant');
     await env.planificateur.tick();
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
   });
 });
 

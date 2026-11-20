@@ -194,6 +194,8 @@ Tu confirmes ta présence ? Réponds OUI ou NON (avant vendredi 20:00).
 
 Le statut passe à **En attente**. Si l'envoi échoue : **Non joignable**.
 
+> **Depuis le 21/11/2026 (S6)** : le texte est suivi d'un **sondage Oui / Non** (« ✅ Oui, je serai là » / « ❌ Non, je ne peux plus »). Voter vaut réponse, sur la bonne action même si on en a plusieurs ; le OUI / NON écrit (règles ci-dessous) reste accepté en secours.
+
 Lecture des réponses en privé :
 
 - si la personne a **une seule** confirmation en attente, « OUI » / « NON » s'y appliquent ;
@@ -210,12 +212,15 @@ Lecture des réponses en privé :
    ✅ Nous vous confirmons votre participation à : Maraude – mardi 25/11 à 19:00 – Gare de Lyon. Merci et à demain !
    ```
 
-3. **Liste finale dans le groupe**, au format hyper simple, une ligne par présent :
+3. **Liste finale dans le groupe**, format « titre + liste » (décidé le 21/11/2026, remplace « une ligne par présent ») :
 
    ```text
-   Maraude – 25/11 – Durand Bob – 06 12 34 56 78
-   Maraude – 25/11 – Martin Alice – 06 11 22 33 44
+   📋 Maraude – mardi 25/11 à 19:00 – Gare de Lyon
+   • Durand Bob – 06 12 34 56 78
+   • Martin Alice – 06 11 22 33 44
    ```
+
+   Avec des créneaux : un bloc « 🕒 créneau » par créneau (ordre du sondage), les présents en dessous ; une personne sur deux créneaux est dans les deux ; créneau vide → « ⚠️ personne » ; créneau inconnu (renommé après le vote) → bloc « 🕒 autre créneau » à la fin.
 
    - Seuls les confirmés apparaissent. Les personnes sans réponse ou désistées sont retirées de la liste finale, mais restent visibles dans l'onglet **Absents** du Sheet.
    - S'il n'y a aucun confirmé : `⚠️ Maraude – 25/11 : personne n'a confirmé. Si tu peux venir, contacte le référent.`
@@ -355,7 +360,7 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
    - Événement `session.status` : STARTING → SCAN_QR_CODE → WORKING (utile pour la surveillance).
    - Non testé : l'ENVOI par l'API (format de la réponse de `sendText`) → vérifié pendant l'étape 5. Consommation sur ARM → au bloc 5.
 
-7b. **OUI sans citation dans le groupe** (compromis validé le 19/11/2026) : un message **court** (≤ 3 mots) détecté comme OUI, **sans citation**, est accepté **s'il n'y a qu'une seule action ouverte** (Annoncée ou Confirmations envoyées, pas encore passée) ; le bot inscrit et envoie en privé « ✅ C'est noté, tu es inscrit(e) pour … Si ce n'était pas pour ça, réponds NON. » (sauf si la demande de confirmation part déjà). S'il y a **plusieurs** actions ouvertes : pas d'inscription, message privé demandant de citer l'annonce. Un NON sans citation dans le groupe reste ignoré (trop ambigu en conversation) ; un **NON en privé** d'un « Inscrit » (avant les confirmations) le retire.
+7b. ~~**OUI sans citation dans le groupe**~~ — **remplacé le 20/11/2026 par le sondage seul (S3)** : les messages texte du groupe sont désormais tous ignorés. Seul reste valable : un **NON en privé** d'un « Inscrit » (avant les confirmations) le retire. Ancienne règle, pour mémoire (compromis validé le 19/11/2026) : un message **court** (≤ 3 mots) détecté comme OUI, **sans citation**, est accepté **s'il n'y a qu'une seule action ouverte** (Annoncée ou Confirmations envoyées, pas encore passée) ; le bot inscrit et envoie en privé « ✅ C'est noté, tu es inscrit(e) pour … Si ce n'était pas pour ça, réponds NON. » (sauf si la demande de confirmation part déjà). S'il y a **plusieurs** actions ouvertes : pas d'inscription, message privé demandant de citer l'annonce. Un NON sans citation dans le groupe reste ignoré (trop ambigu en conversation) ; un **NON en privé** d'un « Inscrit » (avant les confirmations) le retire.
 1. **Migration vers TypeScript** : `package.json`, `tsconfig.json` (strict), Vitest, scripts `npm run verifier` (types + tests), CI mise à jour ; suppression des fichiers Apps Script (`appsscript.json`, clasp, harness Google) ; portage des utilitaires (dates, téléphones, textes, détection oui/non) et de leurs tests.
 2. **Configuration** : `config.ts` (lecture et vérification du `.env`, message clair si une variable manque), `constantes.ts`, `.env.example`, logger console.
 3. **Ports et faux** : interfaces `Messagerie`, `Horloge`, `Tableur` ; faux en mémoire pour les tests (faux Sheet, fausse messagerie, horloge contrôlée).
@@ -377,6 +382,45 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 12. **Déploiement** : `Dockerfile`, `docker-compose.yml` (WAHA + bot, volumes, redémarrage automatique), installation sur le VPS Oracle, sauvegarde de la session WAHA ; test réel dans un groupe WhatsApp de test avec le numéro dédié.
 13. **Documentation** : README pour l'asso (utilisation au quotidien par le référent) + guide d'exploitation pour les mainteneurs (mise à jour, rescanner le QR code, sauvegardes, que faire si WhatsApp casse).
 
+### À faire avant la mise en production (décidé le 20/11/2026)
+
+- **Le groupe de l'asso est une Communauté WhatsApp** (« Ummanite », canal *Announcements* : seuls les admins publient, les membres peuvent répondre). Conséquences :
+  - le **numéro dédié du bot** doit être ajouté à la communauté puis **nommé administrateur** (par un admin actuel) ;
+  - dans une communauté, les numéros des membres sont souvent **masqués** (visibles des admins seulement) → **à tester** : le bot admin obtient-il le vrai numéro (`SenderAlt`) des membres qui répondent ou votent ?
+  - à tester aussi : réponses citées et votes dans un canal d'annonces (comportement possiblement différent d'un groupe classique).
+- **Sondages WhatsApp** (demandé le 20/11/2026, à valider avec la responsable) : remplacer (ou compléter) le « OUI en citant l'annonce » par un **vrai sondage WhatsApp**, comme ceux que la responsable fait à la main (ex. « dispo de 10h à 13h / dispo de 13h à 16h / pas dispo :/ »).
+  - Côté Sheet : nouvelle colonne facultative **Créneaux** dans Actions (ex. `10h-13h, 13h-16h`) ; vide → « dispo / pas dispo ». Nouvelle colonne **Créneau** dans Inscriptions (et dans Présents / la liste finale, regroupée par créneau).
+  - Côté WAHA : `POST /api/sendPoll` (envoi) et événement `poll.vote` (votes, y compris changement ou retrait de vote) — présents dans WAHA 2026.10.1, **support par le moteur GOWS à vérifier**.
+  - Vote pour un créneau → inscription (avec le créneau) ; « pas dispo » ou vote retiré → Retiré ; le « OUI » cité reste en secours.
+  - Étapes : **spike sondages** (groupe de test, puis communauté de test) → adaptateur (envoi + votes) → code métier (créneaux partout). Estimation : 2 à 3 étapes.
+  - **Spike sondages (20/11/2026, groupe de test, GOWS) — concluant** :
+    - `POST /api/sendPoll` `{ session, chatId, poll: { name, options, multipleAnswers } }` → ID long ; ID court du sondage = 3e morceau (ex. `3EB06AE4…`).
+    - Événement `poll.vote` : `payload.vote.selectedOptions` = **libellés en clair** (WAHA déchiffre) ; `payload.poll.id` = ID du sondage (court au 3e morceau, aussi dans `_data.Message.pollUpdateMessage.pollCreationMessageKey.ID`) ; vrai numéro dans `_data.Info.SenderAlt`, nom dans `PushName`.
+    - **Chaque vote = l'état COMPLET des choix** de la personne (ajout d'un créneau → les deux ; décocher tout → `[]`). Donc : créneaux cochés → inscrit(e) sur ces créneaux ; `[]` ou « pas dispo » → Retiré.
+    - Plusieurs votes peuvent arriver dans la même seconde → garder l'horodatage du dernier vote par (sondage, personne) et ignorer un vote plus ancien.
+    - Les votes du compte du bot arrivent aussi (`vote.fromMe = true`) → à ignorer.
+    - Pas de `poll.vote.failed` observé. Reste à tester : **dans une communauté** (canal d'annonces).
+  - **Décisions (20/11/2026)** : **sondage seul** (plus d'inscription par « OUI » en texte dans le groupe ; les réponses en privé restent en texte) ; **plusieurs créneaux par personne** (inscrite une fois, colonne Créneau = « créneau 1, créneau 2 », visible sur chaque créneau dans la liste finale).
+  - **S1 fait** (Sheet) : colonne verte **Créneaux** (Actions, ≤ 11 créneaux, pas de doublon), colonne **Créneau** (Inscriptions, Présents, Absents), paramètres `OPTION_DISPO` (« dispo !! ») et `OPTION_PAS_DISPO` (« pas dispo :/ »), nouveau `TEXTE_ANNONCE` (« 👇 Votez dans le sondage ci-dessous ») ; l'installation remplace l'ancien texte d'annonce seulement s'il n'a pas été personnalisé (`ANCIENNES_VALEURS_PAR_DEFAUT`).
+  - **S2 fait** : l'annonce = TEXTE_ANNONCE puis, 2 s après, le **sondage** (question « {type} – {date} à {heure} » ; créneaux + « pas dispo », plusieurs réponses si ≥ 2 créneaux ; sinon « dispo » / « pas dispo », une réponse) ; l'action garde l'**ID du sondage** dans Message ID ; si le texte part mais pas le sondage → pas de renvoi automatique (marqueur conservé, erreur claire au Journal). Contrat `Messagerie.envoyerSondage`.
+  - **S3 fait** : les votes deviennent des inscriptions (`src/metier/votes.ts`, logique commune dans `src/metier/inscription.ts`) ; plus aucune inscription par texte dans le groupe (`reception.ts` ignore tout message de groupe, sans même lire le Sheet).
+    - Vote = état complet : créneau(x) coché(s) → inscrit(e), colonne Créneau = « c1, c2 » (ordre du sondage) ; « dispo » → inscrit(e) sans créneau ; « pas dispo » ou `[]` → Retiré (Désisté si déjà En attente / Confirmé). Un créneau ET « pas dispo » cochés : le créneau l'emporte.
+    - Changement de créneau d'un Inscrit / En attente / Confirmé : statut gardé, créneau mis à jour (« Créneau modifié » au Journal). Un Retiré garde son dernier créneau (on voit quel créneau a perdu quelqu'un).
+    - Vote après l'envoi des confirmations → demande de confirmation immédiate (comme l'ancien « OUI » tardif). Vote sur une action Annulée / Liste publiée, autre groupe, sondage inconnu → ignoré (info Journal). Numéro masqué → avertissement.
+    - Anti-doublon par ID de vote + horodatage du dernier vote par (sondage, personne) dans `data/etat.json` (clé `votes:<sondage>`) : un vote plus ancien arrivé en retard est ignoré. `poll.vote.failed` → avertissement au Journal.
+    - Créneaux affichés : ligne « 🕒 Créneau : … » dans la demande de confirmation et la validation finale ; liste finale regroupée par créneau (une personne sur 2 créneaux apparaît 2 fois ; créneau inconnu → listé à la fin) ; récap « 2 confirmés (c1 : 1, c2 : 2) ».
+    - Tests : `votes.test.ts`, `creneaux.test.ts`, `convertirWebhookVote` (exemple anonymisé `voteSondage`), routage des votes dans le serveur, quinzaine réécrite avec des votes (BP à 2 créneaux).
+    - Corrigé au test réel (20/11) : un créneau « pas dispo » écrit par le référent dans Créneaux est ignoré (`veutDirePasDispo`), sinon le voter réinscrivait la personne.
+  - **Décisions (21/11/2026), après le test réel** :
+    - **S4 fait** : liste finale au format « titre + liste » (voir §4.5).
+    - **S5 fait** : quand « Envoyer les confirmations maintenant » ou « Publier la liste de demain maintenant » n'envoie rien, la colonne Résultat explique pourquoi (`expliquerAucuneConfirmation`, `expliquerAucuneListe`, calculées sur l'état des actions AVANT la commande) : trop tôt (à partir de quelle date), personne d'inscrit, confirmations pas encore parties, liste déjà publiée, prochaine action.
+    - **S6 fait** : demande de confirmation à J-2 = texte (`TEXTE_CONFIRMATION`, « 👇 … Réponds dans le sondage ci-dessous ») + 2 s + **sondage privé** « {type} – {date} à {heure} : tu confirmes ? » avec `OPTION_CONFIRMER_OUI` (« ✅ Oui, je serai là ») / `OPTION_CONFIRMER_NON` (« ❌ Non, je ne peux plus »), une seule réponse.
+      - « Demande ID » de l'inscription = ID du **sondage** ; un vote hors du groupe est cherché parmi les Demande ID (`traiterVoteConfirmation` dans `votes.ts`) → pas besoin du numéro (marche même avec un LID), ni de citation quand on a plusieurs demandes.
+      - Mêmes règles que le texte (`appliquerReponse`) : avant la liste, Oui → Confirmé / Non → Désisté (changement d'avis possible) ; accusé seulement si le statut change (pas un message par clic) ; vote retiré → rien. Après la liste : Non d'un Confirmé → désistement tardif + référent (`enregistrerDesistementTardif`) ; le reste → ignoré (info).
+      - Le **OUI / NON écrit reste accepté** en secours. Si le texte part mais pas le sondage : « En attente » avec l'ID du texte (avertissement), la personne répond par écrit.
+      - L'ancien `TEXTE_CONFIRMATION` (« Réponds OUI ou NON ») est remplacé à l'installation s'il n'a pas été personnalisé.
+      - ⚠️ Sondages en **conversation privée jamais testés en réel** (seulement dans un groupe) → à vérifier au prochain test.
+
 ### Améliorations prévues (après la mise en service)
 
 14. **Alerte par e-mail au référent** (demandé le 19/11/2026 ; Rayane fournira l'adresse plus tard) : quand WhatsApp est déconnecté ou qu'une erreur grave se répète, envoyer un e-mail en plus de l'alerte dans le Sheet.
@@ -384,13 +428,17 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
    - Pistes (à valider le moment venu, nouvelle dépendance à justifier) : SMTP Gmail d'un compte de l'asso avec un « mot de passe d'application » (validation en 2 étapes obligatoire) + bibliothèque `nodemailer` ; ou un service d'envoi gratuit (ex. Brevo, quelques centaines d'e-mails/jour). Le compte de service Google ne peut pas envoyer d'e-mails Gmail (sauf Google Workspace avec délégation).
    - Variables `.env` à prévoir : `ALERTE_EMAIL_DESTINATAIRE`, identifiants SMTP (secrets).
    - Anti-spam : une alerte par problème et par période (comme l'anti-répétition du Journal), plus un e-mail « c'est réparé ».
+15. **Données des actions passées** (évoqué le 21/11/2026, reporté : « du détail, on verra plus tard ») : aujourd'hui rien ne s'efface, Présents / Absents montrent tout l'historique.
+   - Option A (recommandée d'abord) : filtrer les vues QUERY sur les actions d'aujourd'hui et à venir (garder ~3 jours après l'action), sans rien supprimer.
+   - Option B (plus tard, selon le volume réel) : archivage automatique des actions passées depuis plus de N jours vers des onglets « Archive Actions » / « Archive Inscriptions ».
+   - Écarté : supprimer les données (perte de l'historique, utile pour la phase 2).
 
 ---
 
 ## 8. Critères de réussite
 
 - [ ] Le référent ne fait que remplir l'onglet **Actions** et vérifier **Présents/Absents**.
-- [ ] Les bénévoles n'ont qu'à répondre **OUI** à l'annonce, puis **OUI** à la confirmation.
+- [ ] Les bénévoles n'ont qu'à **voter dans le sondage** de l'annonce, puis répondre **OUI** à la confirmation.
 - [ ] **Aucun doublon** de message, même si le bot redémarre ou si WAHA renvoie un webhook.
 - [ ] On change de fournisseur WhatsApp en écrivant un nouvel adaptateur, **sans toucher au code métier**.
 - [ ] Tout tourne sur le VPS gratuit ; aucun secret dans le repo.

@@ -5,27 +5,30 @@
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, test } from 'vitest';
 import type { Server } from 'node:http';
-import type { MessageRecu } from '../src/ports/messagerie.ts';
+import type { MessageRecu, VoteRecu } from '../src/ports/messagerie.ts';
 import { demarrerServeur } from '../src/serveur.ts';
 import { creerLogger } from '../src/utils/logger.ts';
-import { messageDuBot, reponseCiteeDansLeGroupe, statutSession } from './whatsapp/exemplesWaha.ts';
+import { ID_SONDAGE, messageDuBot, reponseCiteeDansLeGroupe, statutSession, voteSondage } from './whatsapp/exemplesWaha.ts';
 
 let serveur: Server | null = null;
 afterEach(() => { serveur?.close(); serveur = null; });
 
-/** Démarre le serveur sur un port libre (0 = « choisis-en un ») et note les messages transmis. */
+/** Démarre le serveur sur un port libre (0 = « choisis-en un ») et note ce qui est transmis. */
 async function demarrer(surMessage?: (m: MessageRecu) => Promise<void>) {
   const recus: MessageRecu[] = [];
+  const votes: VoteRecu[] = [];
+  const logs: string[] = [];
   serveur = await demarrerServeur({
     port: 0,
-    logger: creerLogger('erreur', () => {}),
+    logger: creerLogger('avertissement', (ligne) => logs.push(ligne)),
     surMessage: surMessage ?? (async (message) => { recus.push(message); }),
+    surVote: async (vote) => { votes.push(vote); },
   });
   const adresse = `http://127.0.0.1:${(serveur.address() as AddressInfo).port}`;
   const envoyer = (corps: unknown) => fetch(`${adresse}/webhook/waha`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps),
   });
-  return { adresse, envoyer, recus };
+  return { adresse, envoyer, recus, votes, logs };
 }
 
 /** Laisse le temps au traitement (lancé après la réponse) de se faire. */
@@ -45,6 +48,23 @@ describe('serveur', () => {
     await unInstant();
     expect(recus).toHaveLength(1);
     expect(recus[0].texte).toBe('oui');
+  });
+
+  test('webhook d\'un vote : répond 200 et transmet le VoteRecu (pas comme un message)', async () => {
+    const { envoyer, recus, votes } = await demarrer();
+    expect((await envoyer(voteSondage)).status).toBe(200);
+    await unInstant();
+    expect(recus).toEqual([]);
+    expect(votes).toHaveLength(1);
+    expect(votes[0].sondageId).toBe(ID_SONDAGE);
+  });
+
+  test('vote illisible (poll.vote.failed) : avertissement pour l\'équipe', async () => {
+    const { envoyer, votes, logs } = await demarrer();
+    await envoyer({ event: 'poll.vote.failed', payload: {} });
+    await unInstant();
+    expect(votes).toEqual([]);
+    expect(logs.some((l) => l.includes('vote de sondage n\'a pas pu être lu'))).toBe(true);
   });
 
   test('événements qui ne concernent pas le bot : 200, mais rien de transmis', async () => {

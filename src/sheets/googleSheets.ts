@@ -168,12 +168,16 @@ export class GoogleSheets implements Tableur, AdministrationTableur {
         requetes.push({ repeatCell: { range: dessous, cell: {}, fields: 'userEnteredValue' } }); // vide les cellules
       }
 
-      // Couleur de l'en-tête : vert = à remplir par le responsable, gris = rempli par le bot
+      // En-tête : couleur (vert = à remplir par le responsable, gris = rempli par le bot)
+      // et note d'aide, visible en survolant l'en-tête (vide = supprime une ancienne note).
       requetes.push({
         repeatCell: {
           range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: index, endColumnIndex: index + 1 },
-          cell: { userEnteredFormat: { backgroundColor: colonne.aRemplir ? VERT_A_REMPLIR : GRIS_AUTOMATIQUE } },
-          fields: 'userEnteredFormat.backgroundColor',
+          cell: {
+            userEnteredFormat: { backgroundColor: colonne.aRemplir ? VERT_A_REMPLIR : GRIS_AUTOMATIQUE },
+            note: colonne.aide ?? '',
+          },
+          fields: 'userEnteredFormat.backgroundColor,note',
         },
       });
 
@@ -191,8 +195,10 @@ export class GoogleSheets implements Tableur, AdministrationTableur {
         });
       }
 
+      // « inputMessage » = bulle d'aide affichée quand on clique dans une case de la colonne
+      const bulle = colonne.aide ? { inputMessage: colonne.aide } : {};
       if (colonne.format === 'case') {
-        requetes.push({ setDataValidation: { range: zone, rule: { condition: { type: 'BOOLEAN' } } } });
+        requetes.push({ setDataValidation: { range: zone, rule: { condition: { type: 'BOOLEAN' }, ...bulle } } });
       } else if (colonne.choix && colonne.choix.length > 0) {
         requetes.push({
           setDataValidation: {
@@ -201,6 +207,18 @@ export class GoogleSheets implements Tableur, AdministrationTableur {
               condition: { type: 'ONE_OF_LIST', values: colonne.choix.map((choix) => ({ userEnteredValue: choix })) },
               showCustomUi: true, // affiche la petite flèche de liste déroulante
               strict: true, // refuse une valeur hors liste
+              ...bulle,
+            },
+          },
+        });
+      } else if (colonne.format === 'date') {
+        requetes.push({
+          setDataValidation: {
+            range: zone,
+            rule: {
+              condition: { type: 'DATE_IS_VALID' },
+              strict: false, // accepte, mais affiche un triangle rouge si ce n'est pas une vraie date
+              ...bulle,
             },
           },
         });

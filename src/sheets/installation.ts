@@ -10,7 +10,7 @@
  *
  * Lancement : npm run installer-sheet (voir scripts/installer-sheet.ts).
  */
-import { COMMANDES, ONGLETS, PARAMETRES_DEFAUT } from '../constantes.ts';
+import { ANCIENNES_VALEURS_PAR_DEFAUT, COMMANDES, ONGLETS, PARAMETRES_DEFAUT, type NomParametre } from '../constantes.ts';
 import type { AdministrationTableur, Tableur } from '../ports/tableur.ts';
 import {
   COLONNES_COMMANDES, COLONNES_ETAT, COLONNES_PARAMETRES, definitionsOnglets, ELEMENTS_ETAT, formulesVues,
@@ -84,6 +84,19 @@ async function completerParametres(tableur: Tableur, rapport: string[]): Promise
   if (aAjouter.length > 0) {
     await tableur.ajouterLignes(ONGLETS.PARAMETRES, aAjouter);
     rapport.push(`Paramètres ajoutés : ${aAjouter.map((ligne) => ligne[P.PARAMETRE]).join(', ')}`);
+  }
+
+  // Anciennes valeurs par défaut devenues fausses : remplacées SEULEMENT si l'équipe ne les a
+  // jamais personnalisées (valeur identique à l'ancienne valeur par défaut).
+  const aMettreAJour = lignes.flatMap((ligne) => {
+    const nom = ligne.valeurs[P.PARAMETRE].trim() as NomParametre;
+    const anciennes = ANCIENNES_VALEURS_PAR_DEFAUT[nom];
+    if (!anciennes?.includes(ligne.valeurs[P.VALEUR])) return [];
+    return [{ numero: ligne.numero, nom, valeurs: { [P.VALEUR]: PARAMETRES_DEFAUT[nom].valeur, [P.DESCRIPTION]: PARAMETRES_DEFAUT[nom].description } }];
+  });
+  if (aMettreAJour.length > 0) {
+    await tableur.modifierLignes(ONGLETS.PARAMETRES, aMettreAJour.map(({ numero, valeurs }) => ({ numero, valeurs })));
+    rapport.push(`Paramètres mis à jour (ancienne valeur par défaut) : ${aMettreAJour.map((m) => m.nom).join(', ')}`);
   }
 
   const types = presents.get('TYPES_ACTIONS') ?? PARAMETRES_DEFAUT.TYPES_ACTIONS.valeur;

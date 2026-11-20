@@ -21,6 +21,15 @@ export interface Messagerie {
    */
   envoyerTexte(destinataire: string, texte: string, options?: { citeId?: string }): Promise<string>;
 
+  /**
+   * Envoie un sondage WhatsApp (les bénévoles votent d'un appui).
+   * @param question titre du sondage, ex. « BP – samedi 28/11 à 14:00 »
+   * @param choix 2 à 12 choix, ex. ['dispo de 10h à 13h', 'dispo de 13h à 16h', 'pas dispo :/']
+   * @param plusieursChoix true = on peut cocher plusieurs cases
+   * @return l'ID du sondage (les votes y feront référence)
+   */
+  envoyerSondage(destinataire: string, question: string, choix: string[], plusieursChoix: boolean): Promise<string>;
+
   /** Les groupes dont le numéro du bot fait partie. */
   listerGroupes(): Promise<Groupe[]>;
 
@@ -39,6 +48,27 @@ export interface EtatConnexion {
   numero: string | null;
   /** Explication en cas de problème (« session déconnectée, rescanner le QR code »…). */
   detail?: string;
+}
+
+/**
+ * Un vote dans un sondage, au format commun à tous les fournisseurs.
+ * IMPORTANT : `choix` contient TOUS les choix actuellement cochés par la personne (pas seulement
+ * le dernier clic) ; une liste vide = elle a retiré son vote (constaté au spike du 20/11/2026).
+ */
+export interface VoteRecu {
+  /** ID unique de ce vote (sert à ignorer les doublons). */
+  id: string;
+  /** ID du sondage concerné (celui renvoyé par envoyerSondage). */
+  sondageId: string;
+  /** Conversation où se trouve le sondage (ID du groupe). */
+  discussionId: string;
+  /** Numéro de la personne qui vote, E.164 sans « + » ; null si WhatsApp le masque. */
+  telephone: string | null;
+  idBrut: string;
+  nomWhatsApp: string;
+  /** Libellés des choix cochés, ex. ['dispo de 10h à 13h', 'dispo de 13h à 16h'] ; [] = vote retiré. */
+  choix: string[];
+  date: Date;
 }
 
 /**

@@ -2,13 +2,15 @@
  * metier/confirmations.ts — Demandes de confirmation J-2 et réponses en privé (CLAUDE.md §4.4).
  *
  * Envoi : à J-2 à partir de HEURE_CONFIRMATION, chaque « Inscrit » reçoit en privé
- *   « Bonjour Bob 👋 … Tu confirmes ta présence ? Réponds OUI ou NON (avant vendredi 20:00). »
+ *   « Bonjour Bob 👋 … Tu confirmes ta présence ? Réponds dans le sondage ci-dessous… »
+ *   puis un sondage « ✅ Oui, je serai là » / « ❌ Non, je ne peux plus » (décidé le 21/11/2026)
  *   → « En attente » (ou « Non joignable » si l'envoi échoue). L'action passe ensuite à
- *   « Confirmations envoyées ».
+ *   « Confirmations envoyées ». Les votes sont traités dans votes.ts.
  *   Rattrapage : si le bot était arrêté à J-2, il envoie dès que possible, au plus tard
  *   la veille avant HEURE_LISTE. Jamais entre 22:00 et 08:00.
  *
- * Réponses en privé : OUI → « Confirmé », NON → « Désisté », puis « C'est noté, merci ! ».
+ * Réponses en privé (vote dans le sondage, ou OUI / NON écrit en secours) :
+ *   OUI → « Confirmé », NON → « Désisté », puis « C'est noté, merci ! ».
  *   Changer d'avis reste possible tant que la liste finale n'est pas publiée.
  */
 import {
@@ -20,7 +22,7 @@ import { lireActions, modifierAction, type Action } from '../sheets/actions.ts';
 import { lireBenevoles, prenomPourMessage, type Benevole } from '../sheets/benevoles.ts';
 import { lireInscriptions, modifierInscriptions, type ChangementsInscription, type Inscription } from '../sheets/inscriptions.ts';
 import type { Parametres } from '../sheets/parametres.ts';
-import { ajouterJours, cleDate, dateLongue, ecartJours, heureDe, jourSemaine } from '../utils/dates.ts';
+import { ajouterJours, cleDate, dateCourte, dateLongue, ecartJours, heureDe, jourSemaine } from '../utils/dates.ts';
 import { formaterTelephone } from '../utils/telephones.ts';
 import { remplirModele } from '../utils/textes.ts';
 import { estDansLaFenetre } from './annonces.ts';
@@ -85,6 +87,35 @@ export function actionsAConfirmer(
     .sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
 }
 
+/**
+ * Pourquoi la commande « Envoyer les confirmations maintenant » n'a rien envoyé
+ * (texte de la colonne Résultat, pour que le référent comprenne sans appeler personne).
+ * À appeler AVANT l'envoi, avec les actions telles qu'elles étaient.
+ *   ex. « BP (24/11) : trop tôt, demandes possibles à partir du 22/11 »
+ */
+export function expliquerAucuneConfirmation(actions: Action[], aujourdhui: string, parametres: Parametres): string {
+  const joursAvant = parametres.joursAvantConfirmation;
+  // Des actions étaient bien dans la période : c'est qu'il n'y avait personne à qui écrire.
+  const concernees = actionsAConfirmer(actions, aujourdhui, '12:00', parametres, 'commande');
+  if (concernees.length > 0) {
+    return concernees.map((a) => `${decrire(a)} : aucun bénévole « Inscrit » à qui écrire (personne n'a voté, ou demandes déjà envoyées)`).join(' ; ');
+  }
+  const annoncees = actions
+    .filter((a) => a.statut === STATUT_ACTION.ANNONCEE && ecartJours(aujourdhui, a.date) >= 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (annoncees.length === 0) {
+    return 'aucune action « Annoncée » à venir (rien n\'est annoncé, ou les demandes sont déjà parties)';
+  }
+  return annoncees.slice(0, 3).map((a) =>
+    `${decrire(a)} : trop tôt, demandes possibles à partir du ${dateCourte(ajouterJours(a.date, -joursAvant))}`,
+  ).join(' ; ');
+}
+
+/** « BP (24/11) » */
+export function decrire(action: Action): string {
+  return `${action.type} (${dateCourte(action.date)})`;
+}
+
 /** Envoie les demandes d'une action, espacées, et enregistre les résultats par paquets. */
 async function envoyerPourUneAction(
   ctx: Contexte, action: Action, cibles: Inscription[], benevoles: Map<string, Benevole>,
@@ -116,22 +147,48 @@ async function envoyerPourUneAction(
 }
 
 /**
- * Envoie UNE demande et renvoie les changements à enregistrer (sans les écrire).
- * Succès → « En attente » + ID du message ; échec → « Non joignable ».
+ * Envoie UNE demande (texte, puis sondage Oui / Non) et renvoie les changements à
+ * enregistrer (sans les écrire) :
+ *   - tout est parti         → « En attente » + ID du SONDAGE (c'est lui qui recevra les votes) ;
+ *   - texte parti, sondage non → « En attente » + ID du texte : la personne peut encore
+ *     répondre OUI / NON par écrit (avertissement au Journal) ;
+ *   - texte non parti        → « Non joignable ».
  */
 async function envoyerUneDemande(
   ctx: Contexte, action: Action, inscription: Inscription, benevole: Benevole | undefined, parametres: Parametres,
 ): Promise<ChangementsInscription> {
+  const qui = `${inscription.nom} (${formaterTelephone(inscription.telephone)})`;
+  let texteId: string;
   try {
-    const demandeId = await ctx.messagerie.envoyerTexte(inscription.telephone, texteDemandeConfirmation(action, benevole, parametres));
-    return { statut: STATUT_INSCRIPTION.EN_ATTENTE, demandeId };
+    texteId = await ctx.messagerie.envoyerTexte(inscription.telephone, texteDemandeConfirmation(action, benevole, parametres, inscription.creneau));
   } catch (erreur) {
-    ctx.logger.avertissement(
-      `Demande de confirmation non envoyée à ${inscription.nom} (${formaterTelephone(inscription.telephone)}) ` +
-      `pour ${action.type} du ${dateLongue(action.date)} : ${String(erreur)}`,
-    );
+    ctx.logger.avertissement(`Demande de confirmation non envoyée à ${qui} pour ${action.type} du ${dateLongue(action.date)} : ${String(erreur)}`);
     return { statut: STATUT_INSCRIPTION.NON_JOIGNABLE, demandeId: '' };
   }
+
+  await ctx.horloge.attendre(PAUSE_ENTRE_MESSAGES_MS); // le sondage arrive juste sous le texte
+  const sondage = sondageDeConfirmation(action, parametres);
+  try {
+    const sondageId = await ctx.messagerie.envoyerSondage(inscription.telephone, sondage.question, sondage.choix, false);
+    return { statut: STATUT_INSCRIPTION.EN_ATTENTE, demandeId: sondageId };
+  } catch (erreur) {
+    ctx.logger.avertissement(
+      `Sondage de confirmation non envoyé à ${qui} (le texte, lui, est parti : il/elle peut répondre OUI ou NON par écrit) : ${String(erreur)}`,
+    );
+    return { statut: STATUT_INSCRIPTION.EN_ATTENTE, demandeId: texteId };
+  }
+}
+
+/**
+ * Le sondage de confirmation (exportée pour les tests) : une seule réponse possible.
+ *   « BP – samedi 28/11 à 14:00 : tu confirmes ? »  [✅ Oui, je serai là] [❌ Non, je ne peux plus]
+ * (L'action est rappelée dans la question : utile quand on a plusieurs demandes en même temps.)
+ */
+export function sondageDeConfirmation(action: Action, parametres: Parametres): { question: string; choix: string[] } {
+  return {
+    question: `${action.type} – ${dateLongue(action.date)} à ${action.heure} : tu confirmes ?`,
+    choix: [parametres.options.confirmerOui, parametres.options.confirmerNon],
+  };
 }
 
 /**
@@ -149,8 +206,13 @@ export async function demanderConfirmationMaintenant(
   }
 }
 
-/** Le texte de la demande, à partir du modèle TEXTE_CONFIRMATION des Paramètres. */
-export function texteDemandeConfirmation(action: Action, benevole: Benevole | undefined, parametres: Parametres): string {
+/**
+ * Le texte de la demande, à partir du modèle TEXTE_CONFIRMATION des Paramètres.
+ * Si la personne a choisi un ou des créneaux, ils sont ajoutés à la fin (quel que soit le modèle).
+ */
+export function texteDemandeConfirmation(
+  action: Action, benevole: Benevole | undefined, parametres: Parametres, creneau = '',
+): string {
   const veille = ajouterJours(action.date, -1);
   const texte = remplirModele(parametres.textes.confirmation, {
     prenom: benevole ? prenomPourMessage(benevole) : '',
@@ -160,7 +222,12 @@ export function texteDemandeConfirmation(action: Action, benevole: Benevole | un
     lieu: action.lieu,
     limite: `${jourSemaine(veille)} ${parametres.heureListe}`, // ex. « vendredi 20:00 »
   });
-  return texte.replace(/ {2,}/g, ' '); // « Bonjour  👋 » (prénom inconnu) → « Bonjour 👋 »
+  return avecCreneau(texte.replace(/ {2,}/g, ' '), creneau); // « Bonjour  👋 » (prénom inconnu) → « Bonjour 👋 »
+}
+
+/** Ajoute « Créneau : … » à la fin d'un message, si la personne a choisi un créneau. */
+export function avecCreneau(texte: string, creneau: string): string {
+  return creneau ? `${texte}\n🕒 Créneau : ${creneau}` : texte;
 }
 
 /** Inscriptions bloquées avec le marqueur : le bot s'est arrêté en plein envoi. Un humain vérifie. */
@@ -212,14 +279,31 @@ export async function traiterReponseConfirmation(ctx: Contexte, message: Message
     return true;
   }
 
+  await appliquerReponse(ctx, cible, reponse, { accuserMemeSansChangement: true });
+  return true;
+}
+
+/**
+ * Applique un OUI / NON (écrit ou voté) à une demande ouverte (liste pas encore publiée) :
+ * OUI → « Confirmé », NON → « Désisté », puis « C'est noté, merci ! ».
+ * @param accuserMemeSansChangement par écrit, on répond toujours (la personne attend une réponse) ;
+ *        par vote, seulement si le statut change (sinon chaque clic dans le sondage ferait un message).
+ */
+export async function appliquerReponse(
+  ctx: Contexte, cible: Inscription, reponse: Reponse, { accuserMemeSansChangement }: { accuserMemeSansChangement: boolean },
+): Promise<void> {
   const statut = reponse === REPONSE.OUI ? STATUT_INSCRIPTION.CONFIRME : STATUT_INSCRIPTION.DESISTE;
-  const action = actionsOuvertes.get(cible.actionId);
-  if (cible.statut !== statut) {
+  const change = cible.statut !== statut;
+  if (change) {
     await modifierInscriptions(ctx.tableur, [{ inscription: cible, changements: { statut } }], ctx.horloge.maintenant());
   }
-  ctx.logger.info(`${statut} : ${cible.nom} pour ${action?.type} du ${dateLongue(cible.date)}`);
-  await envoyerSansPlanter(ctx, telephone, MESSAGES.ACCUSE_RECEPTION);
-  return true;
+  ctx.logger.info(`${statut} : ${cible.nom} pour ${cible.type} du ${dateLongue(cible.date)}`);
+  if (change || accuserMemeSansChangement) await envoyerSansPlanter(ctx, cible.telephone, MESSAGES.ACCUSE_RECEPTION);
+}
+
+/** Statuts auxquels on peut encore répondre ou changer d'avis (exportée pour votes.ts). */
+export function estDemandeOuverte(inscription: Inscription): boolean {
+  return STATUTS_OUVERTS.includes(inscription.statut);
 }
 
 /**

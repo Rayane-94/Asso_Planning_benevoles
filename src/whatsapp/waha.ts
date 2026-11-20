@@ -17,7 +17,7 @@
  *   - les messages envoyés par le compte du bot arrivent aussi, avec fromMe = true → ignorés.
  */
 import type { Config } from '../config.ts';
-import type { EtatConnexion, Groupe, MessageRecu, Messagerie } from '../ports/messagerie.ts';
+import type { EtatConnexion, Groupe, MessageRecu, Messagerie, VoteRecu } from '../ports/messagerie.ts';
 import { normaliserTelephone } from '../utils/telephones.ts';
 
 /** Délai maximum d'une requête vers WAHA (au-delà, on considère qu'il ne répond pas). */
@@ -48,6 +48,17 @@ export class MessagerieWaha implements Messagerie {
       ...(options.citeId ? { reply_to: options.citeId } : {}),
     });
     if (!message.id) throw new Error('WAHA n\'a pas renvoyé d\'ID pour le message envoyé');
+    return idCourt(message.id);
+  }
+
+  /** @return l'ID COURT du sondage (celui que les votes rappelleront) */
+  async envoyerSondage(destinataire: string, question: string, choix: string[], plusieursChoix: boolean): Promise<string> {
+    const message = await this.appeler<{ id?: string }>('POST', '/api/sendPoll', {
+      session: this.config.session,
+      chatId: versChatId(destinataire),
+      poll: { name: question, options: choix, multipleAnswers: plusieursChoix },
+    });
+    if (!message.id) throw new Error('WAHA n\'a pas renvoyé d\'ID pour le sondage envoyé');
     return idCourt(message.id);
   }
 
@@ -140,6 +151,54 @@ export function convertirWebhook(evenement: unknown): MessageRecu | null {
     texte,
     citeId: p.replyTo?.id ? idCourt(p.replyTo.id) : null,
     date: typeof p.timestamp === 'number' ? new Date(p.timestamp * 1000) : new Date(),
+  };
+}
+
+/**
+ * Transforme un vote de sondage reçu de WAHA (événement « poll.vote ») en VoteRecu.
+ * @return null si ce n'est pas un vote, ou si c'est le vote du compte du bot lui-même
+ */
+export function convertirWebhookVote(evenement: unknown): VoteRecu | null {
+  const e = evenement as WebhookVoteWaha;
+  if (e?.event !== 'poll.vote') return null;
+  const p = e.payload;
+  const vote = p?.vote;
+  if (!vote || vote.fromMe) return null;
+
+  const info = p._data?.Info;
+  const idBrut = String(info?.Sender ?? vote.participant ?? '');
+  // L'ID du sondage : dans payload.poll.id (format long) ou dans le message de vote lui-même
+  const sondageLong = p.poll?.id ?? '';
+  const sondageId = sondageLong ? idCourt(sondageLong) : String(p._data?.Message?.pollUpdateMessage?.pollCreationMessageKey?.ID ?? '');
+  if (!sondageId) return null;
+
+  return {
+    id: String(info?.ID ?? idCourt(String(vote.id ?? ''))),
+    sondageId,
+    discussionId: String(vote.from ?? info?.Chat ?? ''),
+    telephone: telephoneDepuisIdentifiant(info?.SenderAlt) ?? telephoneDepuisIdentifiant(idBrut),
+    idBrut,
+    nomWhatsApp: String(info?.PushName ?? ''),
+    choix: Array.isArray(vote.selectedOptions) ? vote.selectedOptions.map(String) : [],
+    date: dateDepuisHorodatage(vote.timestamp),
+  };
+}
+
+/** WAHA donne parfois des secondes, parfois des millisecondes : on accepte les deux. */
+function dateDepuisHorodatage(horodatage: unknown): Date {
+  if (typeof horodatage !== 'number') return new Date();
+  return new Date(horodatage > 1e12 ? horodatage : horodatage * 1000);
+}
+
+interface WebhookVoteWaha {
+  event?: string;
+  payload?: {
+    vote?: { id?: string; from?: string; fromMe?: boolean; participant?: string; selectedOptions?: unknown[]; timestamp?: number };
+    poll?: { id?: string };
+    _data?: {
+      Info?: { ID?: string; Chat?: string; Sender?: string; SenderAlt?: string; PushName?: string };
+      Message?: { pollUpdateMessage?: { pollCreationMessageKey?: { ID?: string } } };
+    };
   };
 }
 

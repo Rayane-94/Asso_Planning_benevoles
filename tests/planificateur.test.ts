@@ -35,7 +35,7 @@ describe('planificateur', () => {
     const env = await contexteDeTest('2026-11-21 18:00');
     await ajouterAction(env, { Type: 'BP', Date: '28/11/2026', Heure: '14:00' });
     await Promise.all([env.planificateur.tick(), env.planificateur.tick()]);
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
     expect(logsDeNiveau(env, 'DEBUG')).toContain('Tick précédent encore en cours : tour sauté');
   });
 

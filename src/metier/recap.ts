@@ -14,7 +14,7 @@
  * dans l'état local (data/etat.json) AVANT l'envoi (effacé si l'envoi échoue).
  */
 import { HEURE_FIN_ENVOIS_AUTO, STATUT_ACTION, STATUT_INSCRIPTION } from '../constantes.ts';
-import type { Action } from '../sheets/actions.ts';
+import { lireCreneaux, type Action } from '../sheets/actions.ts';
 import { lireInscriptions, type Inscription } from '../sheets/inscriptions.ts';
 import { ajouterJours, cleDate, dateLongue, heureDe, horodatage, numeroJourSemaine } from '../utils/dates.ts';
 import { estDansLaFenetre } from './annonces.ts';
@@ -91,11 +91,23 @@ function etatAction(action: Action, inscriptions: Inscription[]): string {
       return 'pas encore annoncée';
     case STATUT_ACTION.ANNONCEE: {
       const inscrits = deCetteAction.filter((i) => i.statut === S.INSCRIT || i.statut === S.EN_ATTENTE || i.statut === S.CONFIRME);
-      return pluriel(inscrits.length, 'inscrit');
+      return pluriel(inscrits.length, 'inscrit') + detailParCreneau(action, inscrits);
     }
-    default: // confirmations envoyées ou liste publiée : on compte les confirmés
-      return pluriel(deCetteAction.filter((i) => i.statut === S.CONFIRME).length, 'confirmé');
+    default: { // confirmations envoyées ou liste publiée : on compte les confirmés
+      const confirmes = deCetteAction.filter((i) => i.statut === S.CONFIRME);
+      return pluriel(confirmes.length, 'confirmé') + detailParCreneau(action, confirmes);
+    }
   }
+}
+
+/** Avec des créneaux : « (dispo de 10h à 13h : 3, dispo de 13h à 16h : 2) » ; sinon rien. */
+function detailParCreneau(action: Action, inscrits: Inscription[]): string {
+  if (action.creneaux.length === 0 || inscrits.length === 0) return '';
+  const details = action.creneaux.map((creneau) => {
+    const nombre = inscrits.filter((i) => lireCreneaux(i.creneau).includes(creneau)).length;
+    return `${creneau} : ${nombre}`;
+  });
+  return ` (${details.join(', ')})`;
 }
 
 /** pluriel(0, 'inscrit') → '0 inscrit' ; pluriel(3, 'inscrit') → '3 inscrits' */
