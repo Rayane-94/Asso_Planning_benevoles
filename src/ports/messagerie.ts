@@ -21,6 +21,15 @@ export interface Messagerie {
    */
   envoyerTexte(destinataire: string, texte: string, options?: { citeId?: string }): Promise<string>;
 
+  /**
+   * Envoie un sondage WhatsApp (les bénévoles votent d'un appui).
+   * @param question titre du sondage, ex. « BP – samedi 28/11 à 14:00 »
+   * @param choix 2 à 12 choix, ex. ['dispo de 10h à 13h', 'dispo de 13h à 16h', 'pas dispo :/']
+   * @param plusieursChoix true = on peut cocher plusieurs cases
+   * @return l'ID du sondage (les votes y feront référence)
+   */
+  envoyerSondage(destinataire: string, question: string, choix: string[], plusieursChoix: boolean): Promise<string>;
+
   /** Les groupes dont le numéro du bot fait partie. */
   listerGroupes(): Promise<Groupe[]>;
 

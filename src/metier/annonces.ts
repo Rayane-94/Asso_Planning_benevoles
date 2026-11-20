@@ -1,9 +1,10 @@
 /**
  * metier/annonces.ts — Publication des annonces dans le groupe (CLAUDE.md §4.2).
  *
- * Une annonce par action (jamais regroupées : chaque réponse doit pouvoir citer
- * SA propre annonce). Après l'envoi, l'action passe à « Annoncée » et l'ID du message
- * est enregistré : c'est lui qui permettra de rattacher les « OUI » à la bonne action.
+ * Une annonce par action (jamais regroupées) = un TEXTE (TEXTE_ANNONCE) suivi d'un SONDAGE
+ * WhatsApp (créneaux de la colonne Créneaux, ou « dispo / pas dispo »). Après l'envoi,
+ * l'action passe à « Annoncée » et l'ID du SONDAGE est enregistré : c'est lui qui permettra
+ * de rattacher chaque vote à la bonne action.
  *
  * Quelles actions annoncer ? (J = aujourd'hui, réglages par défaut)
  *   - automatique (à partir de HEURE_ANNONCE, jusqu'à 22:00) : date entre J+3 et J+7
@@ -79,21 +80,53 @@ async function publierUneAnnonce(ctx: Contexte, groupeId: string, action: Action
   // 1) Marqueur AVANT l'envoi : si on plante après l'envoi, on ne renverra pas en double.
   await modifierAction(ctx.tableur, action, { messageId: MARQUEUR_ENVOI_EN_COURS });
 
-  // 2) Envoi
-  let messageId: string;
+  // 2) Le texte de l'annonce
   try {
-    messageId = await ctx.messagerie.envoyerTexte(groupeId, texte);
+    await ctx.messagerie.envoyerTexte(groupeId, texte);
   } catch (erreur) {
-    // L'envoi a échoué pour de bon : on retire le marqueur pour réessayer au prochain tick.
+    // Rien n'est parti : on retire le marqueur pour réessayer au prochain tick.
     await modifierAction(ctx.tableur, action, { messageId: '' });
     ctx.logger.erreur(`Annonce non envoyée : ${description}`, erreur);
     return false;
   }
 
-  // 3) Enregistrement du résultat
-  await modifierAction(ctx.tableur, action, { statut: STATUT_ACTION.ANNONCEE, messageId });
+  // 3) Le sondage, juste en dessous (c'est lui qui recevra les votes)
+  const { question, choix, plusieursChoix } = sondageDeLAction(action, parametres);
+  let sondageId: string;
+  try {
+    await ctx.horloge.attendre(PAUSE_ENTRE_MESSAGES_MS);
+    sondageId = await ctx.messagerie.envoyerSondage(groupeId, question, choix, plusieursChoix);
+  } catch (erreur) {
+    // Le texte est parti mais pas le sondage : on NE renvoie PAS tout automatiquement (le texte
+    // serait en double). Le marqueur reste : un humain vérifie (voir signalerEnvoisInterrompus).
+    ctx.logger.erreur(
+      `Annonce de ${description} : le texte est parti mais PAS le sondage. Supprimer le texte dans le groupe, ` +
+      'puis vider la cellule « Message ID » (colonne masquée) pour tout renvoyer',
+      erreur,
+    );
+    return false;
+  }
+
+  // 4) Enregistrement : on garde l'ID du SONDAGE (les votes y feront référence)
+  await modifierAction(ctx.tableur, action, { statut: STATUT_ACTION.ANNONCEE, messageId: sondageId });
   ctx.logger.info(`Annonce publiée : ${description}`);
   return true;
+}
+
+/**
+ * Le sondage d'une action (exportée pour les tests).
+ *   - avec créneaux : un choix par créneau + « pas dispo », plusieurs réponses possibles ;
+ *   - sans créneau : « dispo » / « pas dispo », une seule réponse.
+ */
+export function sondageDeLAction(action: Action, parametres: Parametres): { question: string; choix: string[]; plusieursChoix: boolean } {
+  const avecCreneaux = action.creneaux.length > 0;
+  return {
+    question: `${action.type} – ${dateLongue(action.date)} à ${action.heure}`,
+    choix: avecCreneaux
+      ? [...action.creneaux, parametres.options.pasDispo]
+      : [parametres.options.dispo, parametres.options.pasDispo],
+    plusieursChoix: action.creneaux.length > 1,
+  };
 }
 
 /**

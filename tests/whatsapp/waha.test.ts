@@ -113,6 +113,21 @@ describe('MessagerieWaha (avec un faux WAHA)', () => {
     }]);
   });
 
+  test('envoyerSondage : requête au format du spike (poll.name / options / multipleAnswers), renvoie l\'ID COURT', async () => {
+    const { messagerie, appels } = fauxWaha({
+      '/api/sendPoll': { status: 201, corps: { id: `true_${GROUPE}_3EB06AE4FF8398BBED51EC_33700000001@c.us` } },
+    });
+    const id = await messagerie.envoyerSondage(GROUPE, 'BP – samedi 28/11 à 14:00', ['dispo de 10h à 13h', 'pas dispo :/'], true);
+    expect(id).toBe('3EB06AE4FF8398BBED51EC');
+    expect(appels[0]).toEqual({
+      url: '/api/sendPoll', methode: 'POST', cle: 'cle-de-test',
+      corps: {
+        session: 'default', chatId: GROUPE,
+        poll: { name: 'BP – samedi 28/11 à 14:00', options: ['dispo de 10h à 13h', 'pas dispo :/'], multipleAnswers: true },
+      },
+    });
+  });
+
   test('envoyerTexte vers un numéro : converti en …@c.us', async () => {
     const { messagerie, appels } = fauxWaha({ '/api/sendText': { corps: { id: 'true_33612345678@c.us_ABC' } } });
     await messagerie.envoyerTexte('33612345678', 'Bonjour');

@@ -42,7 +42,7 @@ describe('OUI dans le groupe, en citant l\'annonce', () => {
       Téléphone: '06 12 34 56 78', Nom: 'Bob', Statut: 'Inscrit',
     });
     expect(env.tableur.lignes('Bénévoles')[0]).toMatchObject({
-      Téléphone: '06 12 34 56 78', 'Nom WhatsApp': 'Bob', 'Nom demandé le': '2026-11-21 18:05:00',
+      Téléphone: '06 12 34 56 78', 'Nom WhatsApp': 'Bob', 'Nom demandé le': expect.stringMatching(/^2026-11-21 18:05/),
     });
     expect(env.messagerie.envoyes).toEqual([expect.objectContaining({ destinataire: BOB, texte: DEMANDE_NOM })]);
     expect(logsDeNiveau(env, 'INFO')).toContain('Inscription : Bob pour BP du samedi 28/11');
@@ -77,7 +77,7 @@ describe('OUI dans le groupe, en citant l\'annonce', () => {
     await ajouterAction(env, { Type: 'BP', Date: '28/11/2026', Heure: '14:00', Lieu: 'Entrepôt' });
     await ajouterAction(env, { Type: 'Maraude', Date: '25/11/2026', Heure: '19:00', Lieu: 'Gare' });
     await env.planificateur.tick();
-    const annonceMaraude = env.messagerie.envoyes.find((m) => m.texte.includes('Maraude'))?.id ?? '';
+    const annonceMaraude = env.messagerie.sondages().find((m) => m.texte.includes('Maraude'))?.id ?? '';
 
     await recevoirMessage(env.ctx, repondDansLeGroupe(env, 'oui', annonceMaraude));
     expect(env.tableur.lignes('Inscriptions')[0]).toMatchObject({ Type: 'Maraude', 'Action ID': 'A-0002' });

@@ -51,6 +51,17 @@ export class MessagerieWaha implements Messagerie {
     return idCourt(message.id);
   }
 
+  /** @return l'ID COURT du sondage (celui que les votes rappelleront) */
+  async envoyerSondage(destinataire: string, question: string, choix: string[], plusieursChoix: boolean): Promise<string> {
+    const message = await this.appeler<{ id?: string }>('POST', '/api/sendPoll', {
+      session: this.config.session,
+      chatId: versChatId(destinataire),
+      poll: { name: question, options: choix, multipleAnswers: plusieursChoix },
+    });
+    if (!message.id) throw new Error('WAHA n\'a pas renvoyé d\'ID pour le sondage envoyé');
+    return idCourt(message.id);
+  }
+
   async listerGroupes(): Promise<Groupe[]> {
     const reponse = await this.appeler<unknown>('GET', `/api/${encodeURIComponent(this.config.session)}/groups`);
     // Selon le moteur, WAHA renvoie une liste ou un objet { id: groupe } ; et les champs

@@ -54,7 +54,7 @@ describe('récap du vendredi', () => {
     env.horloge.avancer({ minutes: 1 });
     await env.planificateur.tick();
     expect(recaps(env)).toHaveLength(1);
-    expect(env.ctx.etat.lire('recap:2026-11-27')).toBe('2026-11-27 20:30:00');
+    expect(env.ctx.etat.lire('recap:2026-11-27')).toMatch(/^2026-11-27 20:30/);
   });
 
   test.each([

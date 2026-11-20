@@ -22,9 +22,12 @@ export const NUMERO_BOT = '33700000000';
 export interface MessageEnvoye {
   id: string;
   destinataire: string;
+  /** Le texte du message, ou la question du sondage. */
   texte: string;
   citeId: string | null;
   date: Date;
+  /** Présent seulement si c'est un sondage. */
+  sondage?: { choix: string[]; plusieursChoix: boolean };
 }
 
 /** Ce qu'il faut pour fabriquer un message reçu. */
@@ -52,6 +55,8 @@ export class FausseMessagerie implements Messagerie {
   private compteur = 0;
   private connectee = true;
   private readonly destinatairesEnEchec = new Set<string>();
+  /** true = les envois de SONDAGES échouent (les textes passent) : pour tester un envoi à moitié réussi. */
+  sondagesEnEchec = false;
 
   constructor(horloge: Horloge) {
     this.horloge = horloge;
@@ -64,6 +69,17 @@ export class FausseMessagerie implements Messagerie {
     if (this.destinatairesEnEchec.has(destinataire)) throw new Error(`Envoi impossible vers ${destinataire}`);
     const id = `envoye-${++this.compteur}`;
     this.envoyes.push({ id, destinataire, texte, citeId: options.citeId ?? null, date: this.horloge.maintenant() });
+    return id;
+  }
+
+  async envoyerSondage(destinataire: string, question: string, choix: string[], plusieursChoix: boolean): Promise<string> {
+    if (!this.connectee) throw new Error('WhatsApp déconnecté');
+    if (this.destinatairesEnEchec.has(destinataire)) throw new Error(`Envoi impossible vers ${destinataire}`);
+    if (this.sondagesEnEchec) throw new Error('Envoi du sondage impossible (simulation de test)');
+    const id = `sondage-${++this.compteur}`;
+    this.envoyes.push({
+      id, destinataire, texte: question, citeId: null, date: this.horloge.maintenant(), sondage: { choix: [...choix], plusieursChoix },
+    });
     return id;
   }
 
@@ -98,6 +114,16 @@ export class FausseMessagerie implements Messagerie {
   /** Messages envoyés à un destinataire (numéro ou ID de groupe). */
   envoyesA(destinataire: string): MessageEnvoye[] {
     return this.envoyes.filter((message) => message.destinataire === destinataire);
+  }
+
+  /** Les sondages envoyés (dans l'ordre). */
+  sondages(): MessageEnvoye[] {
+    return this.envoyes.filter((message) => message.sondage !== undefined);
+  }
+
+  /** Les messages envoyés qui ne sont PAS des sondages. */
+  textes(): MessageEnvoye[] {
+    return this.envoyes.filter((message) => message.sondage === undefined);
   }
 
   /** Le dernier message envoyé (erreur claire s'il n'y en a aucun). */

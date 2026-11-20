@@ -397,7 +397,8 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
     - Pas de `poll.vote.failed` observé. Reste à tester : **dans une communauté** (canal d'annonces).
   - **Décisions (20/11/2026)** : **sondage seul** (plus d'inscription par « OUI » en texte dans le groupe ; les réponses en privé restent en texte) ; **plusieurs créneaux par personne** (inscrite une fois, colonne Créneau = « créneau 1, créneau 2 », visible sur chaque créneau dans la liste finale).
   - **S1 fait** (Sheet) : colonne verte **Créneaux** (Actions, ≤ 11 créneaux, pas de doublon), colonne **Créneau** (Inscriptions, Présents, Absents), paramètres `OPTION_DISPO` (« dispo !! ») et `OPTION_PAS_DISPO` (« pas dispo :/ »), nouveau `TEXTE_ANNONCE` (« 👇 Votez dans le sondage ci-dessous ») ; l'installation remplace l'ancien texte d'annonce seulement s'il n'a pas été personnalisé (`ANCIENNES_VALEURS_PAR_DEFAUT`).
-  - **S2** : l'annonce part avec son sondage. **S3** : votes → inscriptions, retrait de l'inscription par « OUI » dans le groupe, créneaux dans confirmations / liste / récap, tests (dont la quinzaine).
+  - **S2 fait** : l'annonce = TEXTE_ANNONCE puis, 2 s après, le **sondage** (question « {type} – {date} à {heure} » ; créneaux + « pas dispo », plusieurs réponses si ≥ 2 créneaux ; sinon « dispo » / « pas dispo », une réponse) ; l'action garde l'**ID du sondage** dans Message ID ; si le texte part mais pas le sondage → pas de renvoi automatique (marqueur conservé, erreur claire au Journal). Contrat `Messagerie.envoyerSondage`.
+  - **S3 (prévu)** : votes → inscriptions, retrait de l'inscription par « OUI » dans le groupe, créneaux dans confirmations / liste / récap, tests (dont la quinzaine).
 
 ### Améliorations prévues (après la mise en service)
 

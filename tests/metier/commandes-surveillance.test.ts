@@ -25,9 +25,10 @@ describe('onglet Commandes', () => {
     await cocher(env, 'Annoncer maintenant');
     await env.planificateur.tick();
 
-    expect(env.messagerie.envoyesA(GROUPE_TEST)).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
     expect(commande(env, 'Annoncer maintenant')).toMatchObject({
-      Lancer: '', 'Dernière exécution': '2026-11-21 09:00:00', Résultat: '1 annonce(s) publiée(s)',
+      // (quelques secondes après 09:00 : les 2 s entre le texte et le sondage)
+      Lancer: '', 'Dernière exécution': expect.stringMatching(/^2026-11-21 09:00/), Résultat: '1 annonce(s) publiée(s)',
     });
   });
 
@@ -57,7 +58,7 @@ describe('onglet Commandes', () => {
     env.horloge.avancer({ minutes: 1 });
     await env.planificateur.tick();
     expect(commande(env, 'Annoncer maintenant')?.Résultat).toBe('1 annonce(s) publiée(s)');
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
   });
 
   test.each(['TRUE', 'VRAI', 'true'])('case cochée lue comme « %s » (selon la langue du Sheet)', (valeur) => {
@@ -110,7 +111,7 @@ describe('pause', () => {
     await cocher(env, 'Reprendre');
     await env.planificateur.tick();
     expect(etat(env, 'Bot')?.État).toBe('🟢 Actif');
-    expect(env.messagerie.envoyes).toHaveLength(1); // annoncé dans le même tick
+    expect(env.messagerie.sondages()).toHaveLength(1); // annoncé dans le même tick
   });
 
   test('en pause, les commandes manuelles marchent toujours', async () => {
@@ -120,7 +121,7 @@ describe('pause', () => {
     await env.planificateur.tick();
     await cocher(env, 'Annoncer maintenant');
     await env.planificateur.tick();
-    expect(env.messagerie.envoyes).toHaveLength(1);
+    expect(env.messagerie.sondages()).toHaveLength(1);
   });
 });
 

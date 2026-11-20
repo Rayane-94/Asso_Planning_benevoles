@@ -53,10 +53,11 @@ async function ecritEnPrive(env: EnvironnementDeTest, de: string, texte: string)
 }
 
 /** L'ID de l'annonce publiée pour un type d'action. */
+/** L'ID du sondage publié pour un type d'action (c'est lui que les réponses citent). */
 function annonce(env: EnvironnementDeTest, type: string): string {
-  const message = env.messagerie.envoyesA(GROUPE_TEST).find((m) => m.texte.startsWith(`📣 ${type}`));
-  if (!message) throw new Error(`Annonce ${type} introuvable`);
-  return message.id;
+  const sondage = env.messagerie.sondages().find((m) => m.texte.startsWith(type));
+  if (!sondage) throw new Error(`Sondage ${type} introuvable`);
+  return sondage.id;
 }
 
 const textesA = (env: EnvironnementDeTest, destinataire: string) => env.messagerie.envoyesA(destinataire).map((m) => m.texte);
@@ -113,8 +114,10 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
     // Le groupe : exactement ces 6 messages, dans cet ordre (aucun doublon)
     expect(textesA(env, GROUPE_TEST)).toEqual([
       '📣 Maraude – mercredi 25/11 à 19:00 – Gare de Lyon\n👇 Votez dans le sondage ci-dessous pour participer.',
+      'Maraude – mercredi 25/11 à 19:00', // le sondage
       '📅 Récap de la semaine (samedi 21/11 → vendredi 27/11)\n• Maraude – mercredi 25/11 à 19:00 – Gare de Lyon : 2 inscrits',
       '📣 BP – samedi 28/11 à 14:00 – Entrepôt\n👇 Votez dans le sondage ci-dessous pour participer.',
+      'BP – samedi 28/11 à 14:00', // le sondage
       'Maraude – 25/11 – Durand Bob – 06 12 34 56 78',
       'BP – 28/11 – Durand Bob – 06 12 34 56 78\nBP – 28/11 – Emma – 06 55 55 55 55',
       '📅 Récap de la semaine (samedi 28/11 → vendredi 04/12)\n• BP – samedi 28/11 à 14:00 – Entrepôt : 2 confirmés',
