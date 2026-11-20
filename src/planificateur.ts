@@ -23,6 +23,7 @@ import { publierListes } from './metier/listeFinale.ts';
 import { envoyerRecap } from './metier/recap.ts';
 import { estEnPause, executerCommandes } from './metier/commandes.ts';
 import { surveillerWhatsApp } from './metier/surveillance.ts';
+import { synchroniserInscriptions } from './metier/synchronisation.ts';
 import { attribuerIdsActions, lireActions } from './sheets/actions.ts';
 import { noterDernierPassage } from './sheets/etatBot.ts';
 import { lireParametres } from './sheets/parametres.ts';
@@ -70,6 +71,8 @@ export function creerPlanificateur(ctx: Contexte, journal?: Enregistrable): Plan
         if (donnees) {
           // Les commandes d'abord : « Reprendre » doit agir dès ce tick.
           await tache('Commandes', () => executerCommandes(ctx, donnees));
+          // Copies des actions dans les inscriptions (n'envoie rien : tourne même en pause)
+          await tache('Synchronisation des inscriptions', () => synchroniserInscriptions(ctx, donnees));
           if (estEnPause(ctx)) {
             ctx.logger.debug('Bot en pause : pas d\'envoi automatique');
           } else {
