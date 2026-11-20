@@ -428,6 +428,10 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
    - Pistes (à valider le moment venu, nouvelle dépendance à justifier) : SMTP Gmail d'un compte de l'asso avec un « mot de passe d'application » (validation en 2 étapes obligatoire) + bibliothèque `nodemailer` ; ou un service d'envoi gratuit (ex. Brevo, quelques centaines d'e-mails/jour). Le compte de service Google ne peut pas envoyer d'e-mails Gmail (sauf Google Workspace avec délégation).
    - Variables `.env` à prévoir : `ALERTE_EMAIL_DESTINATAIRE`, identifiants SMTP (secrets).
    - Anti-spam : une alerte par problème et par période (comme l'anti-répétition du Journal), plus un e-mail « c'est réparé ».
+15. **Données des actions passées** (évoqué le 21/11/2026, reporté : « du détail, on verra plus tard ») : aujourd'hui rien ne s'efface, Présents / Absents montrent tout l'historique.
+   - Option A (recommandée d'abord) : filtrer les vues QUERY sur les actions d'aujourd'hui et à venir (garder ~3 jours après l'action), sans rien supprimer.
+   - Option B (plus tard, selon le volume réel) : archivage automatique des actions passées depuis plus de N jours vers des onglets « Archive Actions » / « Archive Inscriptions ».
+   - Écarté : supprimer les données (perte de l'historique, utile pour la phase 2).
 
 ---
 
