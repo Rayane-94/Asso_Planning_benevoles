@@ -87,6 +87,12 @@ export interface ConfigColonne {
   /** Colonne à remplir par le responsable : en-tête en vert (sinon gris = rempli par le bot). */
   aRemplir?: boolean;
   /**
+   * Aide pour l'équipe : ce qu'il faut écrire dans la colonne, avec un exemple. Affichée en
+   * note sur l'en-tête (au survol), et en bulle d'aide quand on clique dans une case
+   * (colonnes avec liste déroulante ou date).
+   */
+  aide?: string;
+  /**
    * Nombre de lignes concernées par le format (sous les en-têtes) ; absent = toute la colonne.
    * Utile pour les cases à cocher : une case seulement en face de chaque commande.
    */

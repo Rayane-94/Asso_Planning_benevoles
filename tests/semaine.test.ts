@@ -112,9 +112,9 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
 
     // Le groupe : exactement ces 6 messages, dans cet ordre (aucun doublon)
     expect(textesA(env, GROUPE_TEST)).toEqual([
-      '📣 Maraude – mercredi 25/11 à 19:00 – Gare de Lyon\nPour participer, répondez OUI en citant ce message (appui long → Répondre).',
+      '📣 Maraude – mercredi 25/11 à 19:00 – Gare de Lyon\n👇 Votez dans le sondage ci-dessous pour participer.',
       '📅 Récap de la semaine (samedi 21/11 → vendredi 27/11)\n• Maraude – mercredi 25/11 à 19:00 – Gare de Lyon : 2 inscrits',
-      '📣 BP – samedi 28/11 à 14:00 – Entrepôt\nPour participer, répondez OUI en citant ce message (appui long → Répondre).',
+      '📣 BP – samedi 28/11 à 14:00 – Entrepôt\n👇 Votez dans le sondage ci-dessous pour participer.',
       'Maraude – 25/11 – Durand Bob – 06 12 34 56 78',
       'BP – 28/11 – Durand Bob – 06 12 34 56 78\nBP – 28/11 – Emma – 06 55 55 55 55',
       '📅 Récap de la semaine (samedi 28/11 → vendredi 04/12)\n• BP – samedi 28/11 à 14:00 – Entrepôt : 2 confirmés',

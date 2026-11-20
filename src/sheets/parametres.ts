@@ -26,6 +26,8 @@ export interface Parametres {
   /** Numéro du référent (E.164 sans « + »), ou null s'il n'est pas renseigné. */
   numeroReferent: string | null;
   typesActions: string[];
+  /** Libellés des choix du sondage : « je viens » (action sans créneaux) et « je ne viens pas ». */
+  options: { dispo: string; pasDispo: string };
   textes: { annonce: string; confirmation: string; validation: string };
 }
 
@@ -71,6 +73,10 @@ export async function lireParametres(tableur: Tableur): Promise<LectureParametre
     heureRecap: lire('HEURE_RECAP', parseHeure, 'une heure comme 20:30'),
     numeroReferent: lireNumeroReferent(valeurs.get('NUMERO_REFERENT') ?? '', avertissements),
     typesActions: lire('TYPES_ACTIONS', listeNonVide, 'des types séparés par des virgules'),
+    options: {
+      dispo: lire('OPTION_DISPO', texteNonVide, 'un texte'),
+      pasDispo: lire('OPTION_PAS_DISPO', texteNonVide, 'un texte'),
+    },
     textes: {
       annonce: lire('TEXTE_ANNONCE', texteNonVide, 'un texte'),
       confirmation: lire('TEXTE_CONFIRMATION', texteNonVide, 'un texte'),

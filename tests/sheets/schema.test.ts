@@ -14,21 +14,21 @@ describe('formulesVues', () => {
 
   test('Présents : seulement les confirmés, triés par date, heure, nom', () => {
     expect(formules.presents).toBe(
-      "=QUERY('Inscriptions'!A:K, \"select C, D, E, F, H, G where I = 'Confirmé' order by D, E, H\", 1)",
+      "=QUERY('Inscriptions'!A:L, \"select C, D, E, I, F, H, G where J = 'Confirmé' order by D, E, H\", 1)",
     );
   });
 
   test('Absents : désistés, sans réponse et non joignables, avec le statut (la raison)', () => {
     expect(formules.absents).toBe(
-      "=QUERY('Inscriptions'!A:K, \"select C, D, E, F, H, G, I where " +
-      "I = 'Désisté' or I = 'Sans réponse' or I = 'Non joignable' order by D, E, H\", 1)",
+      "=QUERY('Inscriptions'!A:L, \"select C, D, E, I, F, H, G, J where " +
+      "J = 'Désisté' or J = 'Sans réponse' or J = 'Non joignable' order by D, E, H\", 1)",
     );
   });
 
   test('Sheet en français : arguments séparés par « ; », virgules de la requête inchangées', () => {
     const enFrancais = formulesVues(Object.values(COLONNES_INSCRIPTIONS), ';');
     expect(enFrancais.presents).toBe(
-      "=QUERY('Inscriptions'!A:K; \"select C, D, E, F, H, G where I = 'Confirmé' order by D, E, H\"; 1)",
+      "=QUERY('Inscriptions'!A:L; \"select C, D, E, I, F, H, G where J = 'Confirmé' order by D, E, H\"; 1)",
     );
   });
 

@@ -28,7 +28,7 @@ describe('annonce J-7 : le cas normal', () => {
     expect(annonce.destinataire).toBe(GROUPE_TEST);
     expect(annonce.texte).toBe(
       '📣 BP – samedi 28/11 à 14:00 – Entrepôt\n' +
-      'Pour participer, répondez OUI en citant ce message (appui long → Répondre).',
+      '👇 Votez dans le sondage ci-dessous pour participer.',
     );
   });
 

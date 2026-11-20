@@ -14,7 +14,8 @@ import type { ConfigColonne, SeparateurArguments } from '../ports/tableur.ts';
 
 export const COLONNES_ACTIONS = {
   ID: 'ID', TYPE: 'Type', DATE: 'Date', HEURE: 'Heure', LIEU: 'Lieu',
-  PLACES: 'Places', STATUT: 'Statut', MESSAGE_ID: 'Message ID',
+  // Créneaux : choix du sondage séparés par des virgules (vide = « dispo » / « pas dispo »)
+  CRENEAUX: 'Créneaux', PLACES: 'Places', STATUT: 'Statut', MESSAGE_ID: 'Message ID',
 } as const;
 
 export const COLONNES_BENEVOLES = {
@@ -24,7 +25,8 @@ export const COLONNES_BENEVOLES = {
 
 export const COLONNES_INSCRIPTIONS = {
   ID: 'ID', ACTION_ID: 'Action ID', TYPE: 'Type', DATE: 'Date', HEURE: 'Heure', LIEU: 'Lieu',
-  TELEPHONE: 'Téléphone', NOM: 'Nom', STATUT: 'Statut', DEMANDE_ID: 'Demande ID', MIS_A_JOUR: 'Mis à jour',
+  // Créneau : le ou les créneaux cochés dans le sondage (vide si l'action n'a pas de créneaux)
+  TELEPHONE: 'Téléphone', NOM: 'Nom', CRENEAU: 'Créneau', STATUT: 'Statut', DEMANDE_ID: 'Demande ID', MIS_A_JOUR: 'Mis à jour',
 } as const;
 
 export const COLONNES_PARAMETRES = {
@@ -97,9 +99,18 @@ export function definitionsOnglets(typesActions: string[]): DefinitionOnglet[] {
     {
       nom: ONGLETS.ACTIONS,
       colonnes: [
-        texte(A.ID), texte(A.TYPE, { choix: typesActions, aRemplir: true }), { nom: A.DATE, format: 'date', aRemplir: true },
-        texte(A.HEURE, { aRemplir: true }), texte(A.LIEU, { aRemplir: true }), texte(A.PLACES, { aRemplir: true }),
-        texte(A.STATUT, { choix: statutsAction }),
+        texte(A.ID, { aide: 'Rempli automatiquement par le bot (ex. A-0001). Ne pas modifier.' }),
+        texte(A.TYPE, { choix: typesActions, aRemplir: true, aide: 'Choisir dans la liste déroulante. Exemple : BP' }),
+        { nom: A.DATE, format: 'date', aRemplir: true, aide: 'Une vraie date au format jj/mm/aaaa. Exemple : 28/11/2026 (pas « samedi » ni « dans 4 jours »)' },
+        texte(A.HEURE, { aRemplir: true, aide: 'Heure de début. Exemples : 14:00, 14h, 14h30' }),
+        texte(A.LIEU, { aRemplir: true, aide: 'Exemple : Local, 5 rue Charles Gounod, Créteil' }),
+        texte(A.CRENEAUX, {
+          aRemplir: true,
+          aide: 'Facultatif. Les choix du sondage, séparés par des virgules. Exemple : dispo de 10h à 13h, dispo de 13h à 16h\n' +
+            'Laisser vide pour un sondage simple « dispo !! / pas dispo :/ ». « pas dispo » est ajouté tout seul. 11 créneaux maximum.',
+        }),
+        texte(A.PLACES, { aRemplir: true, aide: 'Facultatif. Nombre de places, pour information. Exemple : 10' }),
+        texte(A.STATUT, { choix: statutsAction, aide: 'Rempli par le bot. Pour annuler une action : choisir « Annulée » (puis prévenir les bénévoles à la main).' }),
         texte(A.MESSAGE_ID, { masquee: true }),
       ],
     },
@@ -111,16 +122,28 @@ export function definitionsOnglets(typesActions: string[]): DefinitionOnglet[] {
       nom: ONGLETS.INSCRIPTIONS,
       colonnes: [
         texte(I.ID), texte(I.ACTION_ID), texte(I.TYPE), texte(I.DATE), texte(I.HEURE), texte(I.LIEU),
-        texte(I.TELEPHONE), texte(I.NOM), texte(I.STATUT, { choix: statutsInscription }),
+        texte(I.TELEPHONE), texte(I.NOM), texte(I.CRENEAU),
+        texte(I.STATUT, { choix: statutsInscription, aide: 'Rempli par le bot. Pour corriger quelqu\'un : choisir le bon statut dans la liste (ex. Confirmé). Présents et Absents se mettent à jour seuls.' }),
         texte(I.DEMANDE_ID, { masquee: true }), texte(I.MIS_A_JOUR),
       ],
     },
-    { nom: ONGLETS.PARAMETRES, colonnes: [texte(P.PARAMETRE), texte(P.VALEUR, { aRemplir: true }), texte(P.DESCRIPTION)] },
+    {
+      nom: ONGLETS.PARAMETRES,
+      colonnes: [
+        texte(P.PARAMETRE, { aide: 'Ne pas modifier le nom des paramètres.' }),
+        texte(P.VALEUR, { aRemplir: true, aide: 'La valeur à modifier. Le format attendu est expliqué dans la colonne Description. Exemple pour une heure : 18:00' }),
+        texte(P.DESCRIPTION),
+      ],
+    },
     {
       nom: ONGLETS.COMMANDES,
       colonnes: [
         // Une case à cocher seulement en face de chaque commande (pas sur 1000 lignes vides)
-        texte(C.COMMANDE), { nom: C.LANCER, format: 'case', aRemplir: true, lignes: Object.keys(COMMANDES).length },
+        texte(C.COMMANDE, { aide: 'Ne pas modifier le texte des commandes.' }),
+        {
+          nom: C.LANCER, format: 'case', aRemplir: true, lignes: Object.keys(COMMANDES).length,
+          aide: 'Cocher pour lancer la commande. Le bot l\'exécute dans la minute, décoche la case et écrit le résultat.',
+        },
         texte(C.DERNIERE_EXECUTION), texte(C.RESULTAT),
       ],
     },
@@ -153,7 +176,7 @@ export function formulesVues(
   };
   const plage = `'${ONGLETS.INSCRIPTIONS}'!A:${lettreColonne(entetesInscriptions.length - 1)}`;
   const statut = lettre(I.STATUT);
-  const colonnesAffichees = [I.TYPE, I.DATE, I.HEURE, I.LIEU, I.NOM, I.TELEPHONE].map(lettre).join(', ');
+  const colonnesAffichees = [I.TYPE, I.DATE, I.HEURE, I.CRENEAU, I.LIEU, I.NOM, I.TELEPHONE].map(lettre).join(', ');
   const tri = `order by ${lettre(I.DATE)}, ${lettre(I.HEURE)}, ${lettre(I.NOM)}`;
   const S = STATUT_INSCRIPTION;
   /** =QUERY(plage ; "requête" ; 1) avec le bon séparateur ; le 1 = une ligne d'en-têtes. */

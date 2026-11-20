@@ -395,6 +395,9 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
     - Plusieurs votes peuvent arriver dans la même seconde → garder l'horodatage du dernier vote par (sondage, personne) et ignorer un vote plus ancien.
     - Les votes du compte du bot arrivent aussi (`vote.fromMe = true`) → à ignorer.
     - Pas de `poll.vote.failed` observé. Reste à tester : **dans une communauté** (canal d'annonces).
+  - **Décisions (20/11/2026)** : **sondage seul** (plus d'inscription par « OUI » en texte dans le groupe ; les réponses en privé restent en texte) ; **plusieurs créneaux par personne** (inscrite une fois, colonne Créneau = « créneau 1, créneau 2 », visible sur chaque créneau dans la liste finale).
+  - **S1 fait** (Sheet) : colonne verte **Créneaux** (Actions, ≤ 11 créneaux, pas de doublon), colonne **Créneau** (Inscriptions, Présents, Absents), paramètres `OPTION_DISPO` (« dispo !! ») et `OPTION_PAS_DISPO` (« pas dispo :/ »), nouveau `TEXTE_ANNONCE` (« 👇 Votez dans le sondage ci-dessous ») ; l'installation remplace l'ancien texte d'annonce seulement s'il n'a pas été personnalisé (`ANCIENNES_VALEURS_PAR_DEFAUT`).
+  - **S2** : l'annonce part avec son sondage. **S3** : votes → inscriptions, retrait de l'inscription par « OUI » dans le groupe, créneaux dans confirmations / liste / récap, tests (dont la quinzaine).
 
 ### Améliorations prévues (après la mise en service)
 

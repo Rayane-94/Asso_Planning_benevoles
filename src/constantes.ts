@@ -150,9 +150,11 @@ export const PARAMETRES_DEFAUT = {
   HEURE_RECAP: { valeur: '20:30', description: 'Heure du récap de la semaine' },
   NUMERO_REFERENT: { valeur: '', description: 'Numéro du référent (prévenu des désistements tardifs)' },
   TYPES_ACTIONS: { valeur: 'Maraude, BP, Paniers anti-gaspi, Collecte, Événement, Ménage', description: "Types d'actions proposés dans la liste déroulante" },
+  OPTION_DISPO: { valeur: 'dispo !!', description: "Choix « je viens » du sondage, quand l'action n'a pas de créneaux" },
+  OPTION_PAS_DISPO: { valeur: 'pas dispo :/', description: 'Choix « je ne viens pas » du sondage (toujours en dernier)' },
   TEXTE_ANNONCE: {
-    valeur: '📣 {type} – {date} à {heure} – {lieu}\nPour participer, répondez OUI en citant ce message (appui long → Répondre).',
-    description: 'Annonce publiée dans le groupe',
+    valeur: '📣 {type} – {date} à {heure} – {lieu}\n👇 Votez dans le sondage ci-dessous pour participer.',
+    description: 'Annonce publiée dans le groupe, juste avant le sondage',
   },
   TEXTE_CONFIRMATION: {
     valeur: "Bonjour {prenom} 👋 Tu t'es inscrit(e) pour : {type} – {date} à {heure} – {lieu}.\nTu confirmes ta présence ? Réponds OUI ou NON (avant {limite}).",
@@ -164,3 +166,16 @@ export const PARAMETRES_DEFAUT = {
   },
 } as const;
 export type NomParametre = keyof typeof PARAMETRES_DEFAUT;
+
+/**
+ * Anciennes valeurs par défaut devenues fausses. À l'installation, si la valeur du Sheet est
+ * EXACTEMENT l'ancienne (donc jamais personnalisée par l'équipe), elle est remplacée par la
+ * nouvelle. Une valeur personnalisée n'est jamais touchée (un avertissement est donné).
+ */
+export const ANCIENNES_VALEURS_PAR_DEFAUT: Partial<Record<NomParametre, string[]>> = {
+  // Avant les sondages (20/11/2026), on s'inscrivait en répondant OUI en citant l'annonce.
+  TEXTE_ANNONCE: ['📣 {type} – {date} à {heure} – {lieu}\nPour participer, répondez OUI en citant ce message (appui long → Répondre).'],
+};
+
+/** WhatsApp accepte 12 choix maximum par sondage : 11 créneaux + « pas dispo ». */
+export const CRENEAUX_MAX = 11;

@@ -29,6 +29,8 @@ export interface Inscription {
   /** Clé : E.164 sans « + ». */
   telephone: string;
   nom: string;
+  /** Créneau(x) coché(s) dans le sondage, ex. 'dispo de 10h à 13h, dispo de 13h à 16h' ('' si l'action n'a pas de créneaux). */
+  creneau: string;
   statut: StatutInscription;
   /** ID du message privé de demande de confirmation (J-2). */
   demandeId: string;
@@ -70,6 +72,7 @@ export async function lireInscriptions(tableur: Tableur): Promise<LectureInscrip
       lieu: valeurs[I.LIEU].trim(),
       telephone,
       nom: valeurs[I.NOM].trim(),
+      creneau: (valeurs[I.CRENEAU] ?? '').trim(), // ?? '' : colonne absente si le Sheet n'est pas réinstallé
       statut: statut as StatutInscription,
       demandeId: valeurs[I.DEMANDE_ID].trim(),
       misAJour: valeurs[I.MIS_A_JOUR].trim(),
@@ -87,6 +90,8 @@ export interface NouvelleInscription {
   lieu: string;
   telephone: string;
   nom: string;
+  /** Créneau(x) choisi(s) ; absent ou '' si l'action n'a pas de créneaux. */
+  creneau?: string;
   statut: StatutInscription;
 }
 
@@ -111,6 +116,7 @@ export async function ajouterInscription(
     [I.LIEU]: nouvelle.lieu,
     [I.TELEPHONE]: formaterTelephone(nouvelle.telephone),
     [I.NOM]: nouvelle.nom,
+    [I.CRENEAU]: nouvelle.creneau ?? '',
     [I.STATUT]: nouvelle.statut,
     [I.MIS_A_JOUR]: horodatage(maintenant),
   }]);
@@ -122,6 +128,7 @@ export interface ChangementsInscription {
   statut?: StatutInscription;
   demandeId?: string;
   nom?: string;
+  creneau?: string;
   // Recopie des infos de l'action (si le référent a modifié la date, l'heure, le lieu…)
   type?: string;
   date?: CleDate;
@@ -140,7 +147,8 @@ export async function modifierInscriptions(
 ): Promise<void> {
   if (modifications.length === 0) return;
   const correspondance: Record<keyof ChangementsInscription, string> = {
-    statut: I.STATUT, demandeId: I.DEMANDE_ID, nom: I.NOM, type: I.TYPE, date: I.DATE, heure: I.HEURE, lieu: I.LIEU,
+    statut: I.STATUT, demandeId: I.DEMANDE_ID, nom: I.NOM, creneau: I.CRENEAU,
+    type: I.TYPE, date: I.DATE, heure: I.HEURE, lieu: I.LIEU,
   };
 
   await tableur.modifierLignes(ONGLETS.INSCRIPTIONS, modifications.map(({ inscription, changements }) => {

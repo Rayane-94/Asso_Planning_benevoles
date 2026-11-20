@@ -49,7 +49,7 @@ describe('installerSheet sur un Sheet neuf', () => {
     const tableur = new FauxTableur();
     await installer(tableur);
     const aRemplir = (onglet: string) => tableur.configuration(onglet).filter((c) => c.aRemplir).map((c) => c.nom);
-    expect(aRemplir(ONGLETS.ACTIONS)).toEqual(['Type', 'Date', 'Heure', 'Lieu', 'Places']);
+    expect(aRemplir(ONGLETS.ACTIONS)).toEqual(['Type', 'Date', 'Heure', 'Lieu', 'Créneaux', 'Places']);
     expect(aRemplir(ONGLETS.PARAMETRES)).toEqual(['Valeur']);
     expect(aRemplir(ONGLETS.COMMANDES)).toEqual(['Lancer']);
     expect(aRemplir(ONGLETS.INSCRIPTIONS)).toEqual([]); // tout est rempli par le bot
@@ -61,10 +61,23 @@ describe('installerSheet sur un Sheet neuf', () => {
     expect(tableur.configuration(ONGLETS.COMMANDES).find((c) => c.nom === 'Lancer')?.lignes).toBe(7);
   });
 
+  test('chaque colonne verte (à remplir par le responsable) a une aide avec un exemple', async () => {
+    const tableur = new FauxTableur();
+    await installer(tableur);
+    for (const onglet of [ONGLETS.ACTIONS, ONGLETS.PARAMETRES, ONGLETS.COMMANDES]) {
+      for (const colonne of tableur.configuration(onglet).filter((c) => c.aRemplir)) {
+        expect(colonne.aide, `${onglet} › ${colonne.nom}`).toBeTruthy();
+      }
+    }
+    const aide = (nom: string) => tableur.configuration(ONGLETS.ACTIONS).find((c) => c.nom === nom)?.aide;
+    expect(aide('Date')).toContain('28/11/2026');
+    expect(aide('Créneaux')).toContain('dispo de 10h à 13h, dispo de 13h à 16h');
+  });
+
   test('écrit les formules des vues Présents et Absents', async () => {
     const tableur = new FauxTableur();
     await installer(tableur);
-    expect(tableur.formule(ONGLETS.PRESENTS)).toContain("where I = 'Confirmé'");
+    expect(tableur.formule(ONGLETS.PRESENTS)).toContain("where J = 'Confirmé'");
     expect(tableur.formule(ONGLETS.ABSENTS)).toContain("'Sans réponse'");
   });
 
@@ -72,7 +85,7 @@ describe('installerSheet sur un Sheet neuf', () => {
     const tableur = new FauxTableur();
     tableur.separateur = ';';
     await installer(tableur);
-    expect(tableur.formule(ONGLETS.PRESENTS)).toMatch(/^=QUERY\('Inscriptions'!A:K; ".*"; 1\)$/);
+    expect(tableur.formule(ONGLETS.PRESENTS)).toMatch(/^=QUERY\('Inscriptions'!A:L; ".*"; 1\)$/);
   });
 
   test('le rapport liste ce qui a été fait', async () => {
@@ -113,6 +126,40 @@ describe('installerSheet est idempotent (relançable sans danger)', () => {
   });
 });
 
+describe('installerSheet : migration des anciennes valeurs par défaut', () => {
+  const ANCIEN_TEXTE = '📣 {type} – {date} à {heure} – {lieu}\nPour participer, répondez OUI en citant ce message (appui long → Répondre).';
+
+  async function avecTexteAnnonce(texte: string): Promise<FauxTableur> {
+    const tableur = new FauxTableur();
+    await installer(tableur);
+    const ligne = (await tableur.lireOnglet(ONGLETS.PARAMETRES)).lignes.find((l) => l.valeurs.Paramètre === 'TEXTE_ANNONCE');
+    await tableur.modifierLignes(ONGLETS.PARAMETRES, [{ numero: ligne?.numero ?? 0, valeurs: { Valeur: texte } }]);
+    return tableur;
+  }
+  const texteAnnonce = (tableur: FauxTableur) => tableur.lignes(ONGLETS.PARAMETRES).find((p) => p.Paramètre === 'TEXTE_ANNONCE')?.Valeur;
+
+  test("l'ancien texte d'annonce (« répondez OUI en citant ») est remplacé par celui des sondages", async () => {
+    const tableur = await avecTexteAnnonce(ANCIEN_TEXTE);
+    const rapport = await installer(tableur);
+    expect(texteAnnonce(tableur)).toBe(PARAMETRES_DEFAUT.TEXTE_ANNONCE.valeur);
+    expect(rapport).toContain('Paramètres mis à jour (ancienne valeur par défaut) : TEXTE_ANNONCE');
+  });
+
+  test("un texte personnalisé par l'équipe n'est jamais remplacé", async () => {
+    const tableur = await avecTexteAnnonce('📣 Hello la team !! {type} le {date}');
+    await installer(tableur);
+    expect(texteAnnonce(tableur)).toBe('📣 Hello la team !! {type} le {date}');
+  });
+
+  test('nouveaux paramètres des sondages ajoutés', async () => {
+    const tableur = new FauxTableur();
+    await installer(tableur);
+    const parametres = tableur.lignes(ONGLETS.PARAMETRES);
+    expect(parametres.find((p) => p.Paramètre === 'OPTION_DISPO')?.Valeur).toBe('dispo !!');
+    expect(parametres.find((p) => p.Paramètre === 'OPTION_PAS_DISPO')?.Valeur).toBe('pas dispo :/');
+  });
+});
+
 describe('installerSheet répare un Sheet existant', () => {
   test('ajoute une colonne manquante à la fin, sans toucher aux données ni aux colonnes en plus', async () => {
     const tableur = new FauxTableur();
@@ -123,9 +170,9 @@ describe('installerSheet répare un Sheet existant', () => {
 
     const rapport = await installer(tableur);
 
-    expect(await tableur.lireEntetes(ONGLETS.ACTIONS)).toEqual(['ID', 'Type', 'Date', 'Heure', 'Lieu', 'Notes', 'Statut', 'Places', 'Message ID']);
+    expect(await tableur.lireEntetes(ONGLETS.ACTIONS)).toEqual(['ID', 'Type', 'Date', 'Heure', 'Lieu', 'Notes', 'Statut', 'Créneaux', 'Places', 'Message ID']);
     expect(tableur.lignes(ONGLETS.ACTIONS)[0]).toMatchObject({ Type: 'BP', Notes: 'apporter des gants', Places: '' });
-    expect(rapport).toContain('Onglet « Actions » : colonne(s) ajoutée(s) Places, Message ID');
+    expect(rapport).toContain('Onglet « Actions » : colonne(s) ajoutée(s) Créneaux, Places, Message ID');
   });
 
   test('les vues utilisent les lettres réelles si les colonnes d\'Inscriptions ont été déplacées', async () => {
