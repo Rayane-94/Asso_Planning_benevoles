@@ -31,6 +31,24 @@ describe('onglet Commandes', () => {
     });
   });
 
+  test('« Annoncer maintenant » sans rien à publier : le résultat explique POURQUOI (cas réel du 20/11)', async () => {
+    const env = await contexteDeTest('2026-11-20 15:45');
+    await ajouterAction(env, { Type: 'BP', Date: '28/11/2026', Heure: '14:00', Lieu: 'Entrepôt' }); // J+8
+    await cocher(env, 'Annoncer maintenant');
+    await env.planificateur.tick();
+    expect(env.messagerie.envoyes).toEqual([]);
+    expect(commande(env, 'Annoncer maintenant')?.Résultat).toBe(
+      'Aucune annonce publiée : A-0001 (28/11) : trop loin, annonce possible à partir du 21/11',
+    );
+  });
+
+  test('les lignes vides de l\'onglet Commandes (case à cocher seule) sont ignorées', async () => {
+    const env = await contexteDeTest('2026-11-21 09:00');
+    await env.tableur.ajouterLignes('Commandes', [{ Commande: '', Lancer: 'FALSE' }, { Commande: '', Lancer: 'VRAI' }]);
+    await env.planificateur.tick();
+    expect(logsDeNiveau(env, 'INFO').some((l) => l.includes('Commande inconnue'))).toBe(false);
+  });
+
   test('une commande cochée n\'est exécutée qu\'une fois', async () => {
     const env = await contexteDeTest('2026-11-21 09:00');
     await ajouterAction(env, { Type: 'BP', Date: '23/11/2026', Heure: '14:00' });

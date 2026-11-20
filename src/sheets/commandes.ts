@@ -21,11 +21,13 @@ export interface LigneCommande {
 
 export async function lireCommandes(tableur: Tableur): Promise<LigneCommande[]> {
   const { lignes } = await tableur.lireOnglet(ONGLETS.COMMANDES);
-  return lignes.map(({ numero, valeurs }) => ({
-    numero,
-    commande: valeurs[C.COMMANDE].trim(),
-    lancer: estCochee(valeurs[C.LANCER]),
-  }));
+  return lignes
+    .map(({ numero, valeurs }) => ({
+      numero,
+      commande: valeurs[C.COMMANDE].trim(),
+      lancer: estCochee(valeurs[C.LANCER]),
+    }))
+    .filter((ligne) => ligne.commande !== ''); // lignes vides (ex. case à cocher seule) : ignorées
 }
 
 /** « TRUE », « VRAI », « true »… → true ; vide ou « FALSE » / « FAUX » → false. */

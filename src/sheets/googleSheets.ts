@@ -155,8 +155,18 @@ export class GoogleSheets implements Tableur, AdministrationTableur {
     for (const colonne of colonnes) {
       const index = entetes.indexOf(colonne.nom);
       if (index < 0) throw new Error(`Onglet « ${onglet} » : colonne « ${colonne.nom} » introuvable`);
-      // Toute la colonne, sauf la ligne d'en-têtes
-      const zone = { sheetId, startRowIndex: 1, startColumnIndex: index, endColumnIndex: index + 1 };
+      // Toute la colonne sauf la ligne d'en-têtes (ou seulement les `lignes` premières lignes)
+      const colonneSeule = { sheetId, startColumnIndex: index, endColumnIndex: index + 1 };
+      const zone = colonne.lignes === undefined
+        ? { ...colonneSeule, startRowIndex: 1 }
+        : { ...colonneSeule, startRowIndex: 1, endRowIndex: 1 + colonne.lignes };
+      if (colonne.lignes !== undefined) {
+        // En dessous de la zone : on retire format, liste/case et valeurs éventuelles
+        // (répare un Sheet installé avec une ancienne version, où toute la colonne avait des cases).
+        const dessous = { ...colonneSeule, startRowIndex: 1 + colonne.lignes };
+        requetes.push({ setDataValidation: { range: dessous } }); // sans « rule » = supprime la validation
+        requetes.push({ repeatCell: { range: dessous, cell: {}, fields: 'userEnteredValue' } }); // vide les cellules
+      }
 
       // Couleur de l'en-tête : vert = à remplir par le responsable, gris = rempli par le bot
       requetes.push({

@@ -86,6 +86,11 @@ export interface ConfigColonne {
   masquee?: boolean;
   /** Colonne à remplir par le responsable : en-tête en vert (sinon gris = rempli par le bot). */
   aRemplir?: boolean;
+  /**
+   * Nombre de lignes concernées par le format (sous les en-têtes) ; absent = toute la colonne.
+   * Utile pour les cases à cocher : une case seulement en face de chaque commande.
+   */
+  lignes?: number;
 }
 
 // ---------------------------------------------------------------------------
