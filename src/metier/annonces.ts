@@ -15,7 +15,7 @@
 import { HEURE_FIN_ENVOIS_AUTO, MARQUEUR_ENVOI_EN_COURS, PAUSE_ENTRE_MESSAGES_MS, STATUT_ACTION } from '../constantes.ts';
 import { modifierAction, type Action } from '../sheets/actions.ts';
 import type { Parametres } from '../sheets/parametres.ts';
-import { cleDate, dateLongue, ecartJours, heureDe } from '../utils/dates.ts';
+import { ajouterJours, cleDate, dateCourte, dateLongue, ecartJours, heureDe } from '../utils/dates.ts';
 import { remplirModele } from '../utils/textes.ts';
 import type { Contexte, DonneesDuTick } from './contexte.ts';
 
@@ -109,6 +109,28 @@ function signalerEnvoisInterrompus(ctx: Contexte, actions: Action[]): void {
       );
     }
   }
+}
+
+/**
+ * Pourquoi la commande « Annoncer maintenant » n'a rien publié ? Une raison par action
+ * pas encore annoncée, pour que l'équipe comprenne sans aller lire le code.
+ *   ex. 'A-0001 (28/11) : trop loin, annonce possible à partir du 21/11'
+ */
+export function expliquerAucuneAnnonce(actions: Action[], aujourdhui: string, parametres: Parametres): string {
+  const enAttente = actions.filter((action) => action.statut === STATUT_ACTION.A_ANNONCER);
+  if (enAttente.length === 0) {
+    return 'aucune action à annoncer (toutes sont déjà annoncées ou annulées ; une ligne incomplète est signalée dans le Journal)';
+  }
+  return enAttente.map((action) => {
+    const ecart = ecartJours(aujourdhui, action.date);
+    const quoi = `${action.id || `ligne ${action.numero}`} (${dateCourte(action.date)})`;
+    if (action.messageId === MARQUEUR_ENVOI_EN_COURS) return `${quoi} : envoi peut-être interrompu, voir le Journal`;
+    if (ecart < 0) return `${quoi} : date passée`;
+    if (ecart > parametres.joursAvantAnnonce) {
+      return `${quoi} : trop loin, annonce possible à partir du ${dateCourte(ajouterJours(action.date, -parametres.joursAvantAnnonce))}`;
+    }
+    return `${quoi} : non envoyée, voir le Journal`;
+  }).join(' ; ');
 }
 
 /** '18:30' est-il dans [debut, fin[ ? (les heures 'HH:mm' se comparent comme du texte) */

@@ -14,10 +14,10 @@ import { COMMANDES } from '../constantes.ts';
 import { lireCommandes, noterResultatCommande } from '../sheets/commandes.ts';
 import { ecrireEtat } from '../sheets/etatBot.ts';
 import { ELEMENTS_ETAT } from '../sheets/schema.ts';
-import { horodatage } from '../utils/dates.ts';
+import { cleDate, horodatage } from '../utils/dates.ts';
 import { decrireErreur } from '../utils/logger.ts';
 import { formaterTelephone } from '../utils/telephones.ts';
-import { publierAnnonces } from './annonces.ts';
+import { expliquerAucuneAnnonce, publierAnnonces } from './annonces.ts';
 import { envoyerConfirmations } from './confirmations.ts';
 import type { Contexte, DonneesDuTick } from './contexte.ts';
 import { publierListes } from './listeFinale.ts';
@@ -52,8 +52,11 @@ export async function executerCommandes(ctx: Contexte, donnees: DonneesDuTick): 
 async function executer(ctx: Contexte, donnees: DonneesDuTick, commande: string): Promise<string> {
   const maintenant = ctx.horloge.maintenant();
   switch (commande) {
-    case COMMANDES.ANNONCER:
-      return `${await publierAnnonces(ctx, donnees, 'commande')} annonce(s) publiée(s)`;
+    case COMMANDES.ANNONCER: {
+      const publiees = await publierAnnonces(ctx, donnees, 'commande');
+      if (publiees > 0) return `${publiees} annonce(s) publiée(s)`;
+      return `Aucune annonce publiée : ${expliquerAucuneAnnonce(donnees.actions, cleDate(maintenant), donnees.parametres)}`;
+    }
     case COMMANDES.CONFIRMATIONS:
       return `${await envoyerConfirmations(ctx, donnees, 'commande')} demande(s) de confirmation envoyée(s)`;
     case COMMANDES.LISTE:

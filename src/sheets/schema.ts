@@ -5,7 +5,7 @@
  * et le code du bot utilise ces noms de colonnes (jamais de texte écrit en dur ailleurs).
  * Pour ajouter une colonne : l'ajouter ici, puis relancer `npm run installer-sheet`.
  */
-import { ONGLETS, STATUT_ACTION, STATUT_INSCRIPTION } from '../constantes.ts';
+import { COMMANDES, ONGLETS, STATUT_ACTION, STATUT_INSCRIPTION } from '../constantes.ts';
 import type { ConfigColonne, SeparateurArguments } from '../ports/tableur.ts';
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,8 @@ export function definitionsOnglets(typesActions: string[]): DefinitionOnglet[] {
     {
       nom: ONGLETS.COMMANDES,
       colonnes: [
-        texte(C.COMMANDE), { nom: C.LANCER, format: 'case', aRemplir: true },
+        // Une case à cocher seulement en face de chaque commande (pas sur 1000 lignes vides)
+        texte(C.COMMANDE), { nom: C.LANCER, format: 'case', aRemplir: true, lignes: Object.keys(COMMANDES).length },
         texte(C.DERNIERE_EXECUTION), texte(C.RESULTAT),
       ],
     },

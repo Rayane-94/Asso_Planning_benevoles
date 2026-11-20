@@ -20,6 +20,10 @@ npm run types        # vérifie les types TypeScript
 npm run verifier     # les deux (c'est ce que fait la CI)
 npm run test:surveiller  # relance les tests à chaque modification
 npm run installer-sheet  # crée / répare les onglets du Google Sheet (voir docs/compte-service-google.md)
+
+docker compose up -d     # démarre WAHA (WhatsApp) — tableau de bord : http://localhost:3001/dashboard
+npm run lister-groupes   # affiche les groupes WhatsApp et leur GROUPE_ID
+npm start                # démarre le bot
 ```
 
 ## Structure

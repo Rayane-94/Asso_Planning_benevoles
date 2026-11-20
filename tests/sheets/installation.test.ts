@@ -55,6 +55,12 @@ describe('installerSheet sur un Sheet neuf', () => {
     expect(aRemplir(ONGLETS.INSCRIPTIONS)).toEqual([]); // tout est rempli par le bot
   });
 
+  test('cases à cocher « Lancer » : seulement en face des 7 commandes, pas sur toute la colonne', async () => {
+    const tableur = new FauxTableur();
+    await installer(tableur);
+    expect(tableur.configuration(ONGLETS.COMMANDES).find((c) => c.nom === 'Lancer')?.lignes).toBe(7);
+  });
+
   test('écrit les formules des vues Présents et Absents', async () => {
     const tableur = new FauxTableur();
     await installer(tableur);
