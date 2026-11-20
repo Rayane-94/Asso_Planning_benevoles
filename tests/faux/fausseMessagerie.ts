@@ -10,7 +10,7 @@
  *   });
  *   await traiterMessage(reponse);                          // le bot traite la réponse
  */
-import type { EtatConnexion, Groupe, MessageRecu, Messagerie } from '../../src/ports/messagerie.ts';
+import type { EtatConnexion, Groupe, MessageRecu, Messagerie, VoteRecu } from '../../src/ports/messagerie.ts';
 import type { Horloge } from '../../src/ports/horloge.ts';
 
 /** ID du groupe WhatsApp de test. */
@@ -42,6 +42,19 @@ export interface DescriptionMessageRecu {
   /** Nom WhatsApp de l'expéditeur. */
   nom?: string;
   /** Pour simuler un doublon : réutiliser l'ID d'un message déjà reçu. */
+  id?: string;
+}
+
+/** Ce qu'il faut pour fabriquer un vote. */
+export interface DescriptionVote {
+  /** Numéro de la personne qui vote ; null pour simuler un numéro masqué. */
+  de: string | null;
+  /** ID du sondage (celui renvoyé par envoyerSondage). */
+  sondage: string;
+  /** Tous les choix cochés après ce vote ; [] = vote retiré. */
+  choix: string[];
+  nom?: string;
+  groupe?: string;
   id?: string;
 }
 
@@ -107,6 +120,24 @@ export class FausseMessagerie implements Messagerie {
       nomWhatsApp: nom,
       texte,
       citeId: cite ?? null,
+      date: this.horloge.maintenant(),
+    };
+  }
+
+  /**
+   * Fabrique un vote dans un sondage (à passer ensuite à recevoirVote).
+   * `choix` = TOUS les choix cochés après ce vote (comme WhatsApp) ; [] = vote retiré.
+   */
+  vote({ de, sondage, choix, nom = '', groupe = GROUPE_TEST, id }: DescriptionVote): VoteRecu {
+    const idBrut = de ?? `lid-${++this.compteur}`;
+    return {
+      id: id ?? `vote-${++this.compteur}`,
+      sondageId: sondage,
+      discussionId: groupe,
+      telephone: de,
+      idBrut,
+      nomWhatsApp: nom,
+      choix: [...choix],
       date: this.horloge.maintenant(),
     };
   }

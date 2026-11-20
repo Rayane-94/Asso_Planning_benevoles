@@ -19,6 +19,7 @@ import { ELEMENTS_ETAT } from './sheets/schema.ts';
 import { horodatage } from './utils/dates.ts';
 import type { Contexte } from './metier/contexte.ts';
 import { recevoirMessage } from './metier/reception.ts';
+import { recevoirVote } from './metier/votes.ts';
 import { creerPlanificateur } from './planificateur.ts';
 import { horlogeSysteme } from './ports/horloge.ts';
 import { demarrerServeur } from './serveur.ts';
@@ -63,6 +64,7 @@ async function demarrer(): Promise<void> {
     port: config.port,
     logger,
     surMessage: (message) => recevoirMessage(ctx, message),
+    surVote: (vote) => recevoirVote(ctx, vote),
   });
   const planificateur = creerPlanificateur(ctx, journal);
 

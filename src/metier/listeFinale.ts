@@ -18,7 +18,7 @@
 import {
   HEURE_DEBUT_ENVOIS_AUTO, HEURE_FIN_ENVOIS_AUTO, PAUSE_ENTRE_MESSAGES_MS, STATUT_ACTION, STATUT_INSCRIPTION,
 } from '../constantes.ts';
-import { modifierAction, type Action } from '../sheets/actions.ts';
+import { lireCreneaux, modifierAction, type Action } from '../sheets/actions.ts';
 import { lireBenevoles, prenomPourMessage, type Benevole } from '../sheets/benevoles.ts';
 import { lireInscriptions, modifierInscriptions, type Inscription } from '../sheets/inscriptions.ts';
 import type { Parametres } from '../sheets/parametres.ts';
@@ -26,6 +26,7 @@ import { cleDate, dateCourte, dateLongue, ecartJours, heureDe } from '../utils/d
 import { formaterTelephone } from '../utils/telephones.ts';
 import { remplirModele } from '../utils/textes.ts';
 import { estDansLaFenetre } from './annonces.ts';
+import { avecCreneau } from './confirmations.ts';
 import type { Contexte, DonneesDuTick } from './contexte.ts';
 
 export type ModeListe = 'automatique' | 'commande';
@@ -111,10 +112,10 @@ async function publierUneListe(
   // 4) Confirmation finale en privé à chaque confirmé (un échec n'empêche pas les autres)
   for (const inscription of confirmes) {
     await ctx.horloge.attendre(PAUSE_ENTRE_MESSAGES_MS);
-    const texte = remplirModele(parametres.textes.validation, {
+    const texte = avecCreneau(remplirModele(parametres.textes.validation, {
       type: action.type, date: dateLongue(action.date), heure: action.heure, lieu: action.lieu,
       prenom: prenomPourMessage(benevoles.get(inscription.telephone) ?? { prenom: '', nomWhatsApp: '' }),
-    });
+    }), inscription.creneau);
     try {
       await ctx.messagerie.envoyerTexte(inscription.telephone, texte);
     } catch (erreur) {
@@ -126,6 +127,10 @@ async function publierUneListe(
 
 /**
  * Le texte de la liste, au format volontairement minimaliste (une ligne par présent).
+ *   - sans créneaux : « BP – 28/11 – Durand Bob – 06 12 34 56 78 »
+ *   - avec créneaux : regroupée par créneau (dans l'ordre du sondage) ; une personne inscrite
+ *     sur deux créneaux apparaît sur les deux :
+ *       « BP – 28/11 – dispo de 10h à 13h – Durand Bob – 06 12 34 56 78 »
  * Exportée pour les tests.
  */
 export function texteListe(action: Action, confirmes: Inscription[]): string {
@@ -133,9 +138,22 @@ export function texteListe(action: Action, confirmes: Inscription[]): string {
   if (confirmes.length === 0) {
     return `⚠️ ${action.type} – ${jour} : personne n'a confirmé. Si tu peux venir, contacte le référent.`;
   }
-  return confirmes
-    .map((inscription) => `${action.type} – ${jour} – ${inscription.nom} – ${formaterTelephone(inscription.telephone)}`)
-    .join('\n');
+  const ligne = (inscription: Inscription, creneau?: string) =>
+    [action.type, jour, creneau, inscription.nom, formaterTelephone(inscription.telephone)].filter(Boolean).join(' – ');
+
+  if (action.creneaux.length === 0) return confirmes.map((inscription) => ligne(inscription)).join('\n');
+
+  const lignes: string[] = [];
+  for (const creneau of action.creneaux) {
+    for (const inscription of confirmes) {
+      if (lireCreneaux(inscription.creneau).includes(creneau)) lignes.push(ligne(inscription, creneau));
+    }
+  }
+  // Confirmés sans créneau reconnu (ex. créneau renommé après le vote) : listés quand même, à la fin.
+  for (const inscription of confirmes) {
+    if (!lireCreneaux(inscription.creneau).some((c) => action.creneaux.includes(c))) lignes.push(ligne(inscription, inscription.creneau || undefined));
+  }
+  return lignes.join('\n');
 }
 
 /**

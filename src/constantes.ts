@@ -74,15 +74,9 @@ export const MESSAGES = {
   ACCUSE_RECEPTION: "C'est noté, merci !",
   /** La personne a plusieurs demandes en attente et n'a pas cité laquelle. */
   CITER_LE_MESSAGE: 'Tu as plusieurs actions en attente, réponds en citant le message concerné (appui long → Répondre).',
-  /** OUI sans citation accepté (une seule action ouverte) : on dit pour quelle action. */
-  INSCRIPTION_SANS_CITATION:
-    "✅ C'est noté, tu es inscrit(e) pour : {type} – {date} à {heure} – {lieu}. Si ce n'était pas pour ça, réponds NON.",
-  /** OUI sans citation alors que plusieurs actions sont ouvertes. */
-  CITER_ANNONCE:
-    "Plusieurs actions sont ouvertes : pour t'inscrire, réponds OUI dans le groupe en citant l'annonce de ton choix (appui long → Répondre).",
   /** NON en privé alors que la personne est inscrite à plusieurs actions. */
   CITER_POUR_RETIRER:
-    "Tu es inscrit(e) à plusieurs actions : pour te retirer, réponds NON dans le groupe en citant l'annonce concernée (appui long → Répondre).",
+    "Tu es inscrit(e) à plusieurs actions : pour te retirer, décoche ton vote dans le sondage de l'action concernée (ou coche « pas dispo »).",
   /** Au référent, quand un confirmé se désiste après la publication de la liste. */
   ALERTE_DESISTEMENT: '⚠️ Désistement de dernière minute : {nom} ({telephone}) ne viendra pas à {type} – {date} à {heure} – {lieu}.',
 } as const;

@@ -8,20 +8,22 @@
  *
  * L'histoire (novembre 2026) :
  *   Lun 16 09:00  le référent ajoute une Maraude (mer 25) et un BP (sam 28)
- *   Mer 18 18:00  📣 Maraude annoncée ; Bob (nouveau), Alice et Chloé répondent OUI ;
- *                 Bob donne son nom en privé ; Chloé se ravise (« finalement non »)
+ *   Mer 18 18:00  📣 Maraude annoncée (sondage dispo / pas dispo) ; Bob (nouveau), Alice et
+ *                 Chloé votent « dispo » ; Bob donne son nom en privé ; Chloé repasse « pas dispo »
  *   Ven 20 20:30  📅 récap : Maraude, 2 inscrits
- *   Sam 21 18:00  📣 BP annoncé ; Bob, Alice et David (nouveau) répondent OUI
+ *   Sam 21 18:00  📣 BP annoncé (sondage à 2 créneaux) ; Bob coche les deux, Alice 14h-16h,
+ *                 David (nouveau) 16h-18h
  *   Lun 23 10:00  demandes de confirmation Maraude ; Bob OUI, Alice ne répond pas
  *   Mar 24 20:00  liste Maraude : Bob ; Alice « Sans réponse »
  *   Mar 24 21:00  Bob se désiste en privé → le référent est prévenu
  *   Jeu 26 10:00  demandes de confirmation BP ; Bob OUI, Alice NON, David ne répond pas
- *   Jeu 26 15:00  Emma (nouvelle) répond OUI à l'annonce, en retard → demande immédiate → OUI
- *   Ven 27 20:00  liste BP : Bob et Emma ; David « Sans réponse »
- *   Ven 27 20:30  📅 récap : BP, 2 confirmés
+ *   Jeu 26 15:00  Emma (nouvelle) vote 16h-18h, en retard → demande immédiate → OUI
+ *   Ven 27 20:00  liste BP regroupée par créneau : Bob (sur les deux) et Emma ; David « Sans réponse »
+ *   Ven 27 20:30  📅 récap : BP, 2 confirmés (détail par créneau)
  */
 import { describe, expect, test } from 'vitest';
 import { recevoirMessage } from '../src/metier/reception.ts';
+import { recevoirVote } from '../src/metier/votes.ts';
 import { GROUPE_TEST } from './faux/fausseMessagerie.ts';
 import { ajouterAction, contexteDeTest, logsDeNiveau, type EnvironnementDeTest } from './faux/contexteDeTest.ts';
 import { ajouterLignesDeTest, changerParametre } from './faux/sheetDeTest.ts';
@@ -42,10 +44,13 @@ async function vivreJusqua(env: EnvironnementDeTest, cible: string): Promise<voi
   }
 }
 
-/** Un bénévole écrit dans le groupe en citant un message (une annonce). */
-async function repondDansLeGroupe(env: EnvironnementDeTest, de: string, nom: string, texte: string, cite: string): Promise<void> {
-  await recevoirMessage(env.ctx, env.messagerie.recu({ de, nom, texte, groupe: GROUPE_TEST, cite }));
+/** Un bénévole vote dans le sondage : choix = tout ce qui est coché après ce vote. */
+async function vote(env: EnvironnementDeTest, de: string, nom: string, sondage: string, choix: string[]): Promise<void> {
+  await recevoirVote(env.ctx, env.messagerie.vote({ de, nom, sondage, choix }));
 }
+
+const CRENEAU_1 = 'dispo de 14h à 16h';
+const CRENEAU_2 = 'dispo de 16h à 18h';
 
 /** Un bénévole écrit au bot en privé. */
 async function ecritEnPrive(env: EnvironnementDeTest, de: string, texte: string): Promise<void> {
@@ -69,24 +74,24 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
     await changerParametre(env.tableur, 'NUMERO_REFERENT', '06 99 99 99 99');
     await ajouterLignesDeTest(env.tableur, 'Bénévoles', [{ Téléphone: '06 11 22 33 44', Prénom: 'Alice', Nom: 'Martin' }]);
     await ajouterAction(env, { Type: 'Maraude', Date: '25/11/2026', Heure: '19:00', Lieu: 'Gare de Lyon' });
-    await ajouterAction(env, { Type: 'BP', Date: '28/11/2026', Heure: '14:00', Lieu: 'Entrepôt' });
+    await ajouterAction(env, { Type: 'BP', Date: '28/11/2026', Heure: '14:00', Lieu: 'Entrepôt', Créneaux: `${CRENEAU_1}, ${CRENEAU_2}` });
 
     // ----- Mercredi 18 : annonce de la Maraude et réponses -----
     await vivreJusqua(env, '2026-11-18 18:30');
     const maraude = annonce(env, 'Maraude');
-    await repondDansLeGroupe(env, BOB, 'Bob', 'Oui je viens !', maraude);
-    await repondDansLeGroupe(env, ALICE, 'Alice M', '👍', maraude);
-    await repondDansLeGroupe(env, CHLOE, 'Chloé', 'oui', maraude);
+    await vote(env, BOB, 'Bob', maraude, ['dispo !!']);
+    await vote(env, ALICE, 'Alice M', maraude, ['dispo !!']);
+    await vote(env, CHLOE, 'Chloé', maraude, ['dispo !!']);
     await ecritEnPrive(env, BOB, 'bob durand'); // réponse à « peux-tu me donner ton prénom et ton nom ? »
     await vivreJusqua(env, '2026-11-18 21:00');
-    await repondDansLeGroupe(env, CHLOE, 'Chloé', 'finalement non désolée', maraude);
+    await vote(env, CHLOE, 'Chloé', maraude, ['pas dispo :/']); // elle change d'avis dans le sondage
 
     // ----- Samedi 21 : annonce du BP et réponses -----
     await vivreJusqua(env, '2026-11-21 19:00');
     const bp = annonce(env, 'BP');
-    await repondDansLeGroupe(env, BOB, 'Bob', 'dispo', bp);
-    await repondDansLeGroupe(env, ALICE, 'Alice M', 'ok', bp);
-    await repondDansLeGroupe(env, DAVID, 'David', 'Ok pour moi', bp);
+    await vote(env, BOB, 'Bob', bp, [CRENEAU_1, CRENEAU_2]); // les deux créneaux
+    await vote(env, ALICE, 'Alice M', bp, [CRENEAU_1]);
+    await vote(env, DAVID, 'David', bp, [CRENEAU_2]);
 
     // ----- Lundi 23 : confirmations de la Maraude -----
     await vivreJusqua(env, '2026-11-23 11:00');
@@ -101,7 +106,7 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
     await ecritEnPrive(env, BOB, 'oui');
     await ecritEnPrive(env, ALICE, 'non pas dispo'); // David ne répond pas
     await vivreJusqua(env, '2026-11-26 15:00');
-    await repondDansLeGroupe(env, EMMA, 'Emma', 'oui je viens !', bp); // en retard
+    await vote(env, EMMA, 'Emma', bp, [CRENEAU_2]); // en retard
     await ecritEnPrive(env, EMMA, 'Oui');
 
     // ----- Vendredi 27 : liste du BP et récap -----
@@ -119,8 +124,11 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
       '📣 BP – samedi 28/11 à 14:00 – Entrepôt\n👇 Votez dans le sondage ci-dessous pour participer.',
       'BP – samedi 28/11 à 14:00', // le sondage
       'Maraude – 25/11 – Durand Bob – 06 12 34 56 78',
-      'BP – 28/11 – Durand Bob – 06 12 34 56 78\nBP – 28/11 – Emma – 06 55 55 55 55',
-      '📅 Récap de la semaine (samedi 28/11 → vendredi 04/12)\n• BP – samedi 28/11 à 14:00 – Entrepôt : 2 confirmés',
+      // la liste du BP est regroupée par créneau ; Bob apparaît sur les deux
+      'BP – 28/11 – dispo de 14h à 16h – Durand Bob – 06 12 34 56 78\n' +
+        'BP – 28/11 – dispo de 16h à 18h – Durand Bob – 06 12 34 56 78\n' +
+        'BP – 28/11 – dispo de 16h à 18h – Emma – 06 55 55 55 55',
+      '📅 Récap de la semaine (samedi 28/11 → vendredi 04/12)\n• BP – samedi 28/11 à 14:00 – Entrepôt : 2 confirmés (dispo de 14h à 16h : 1, dispo de 16h à 18h : 2)',
     ]);
 
     // Bob : tout le parcours, chaque message une seule fois
@@ -131,9 +139,9 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
       "C'est noté, merci !",
       '✅ Nous vous confirmons votre participation à : Maraude – mercredi 25/11 à 19:00 – Gare de Lyon. Merci et à demain !',
       "C'est noté, merci !", // son désistement de mardi soir
-      "Bonjour Bob 👋 Tu t'es inscrit(e) pour : BP – samedi 28/11 à 14:00 – Entrepôt.\nTu confirmes ta présence ? Réponds OUI ou NON (avant vendredi 20:00).",
+      "Bonjour Bob 👋 Tu t'es inscrit(e) pour : BP – samedi 28/11 à 14:00 – Entrepôt.\nTu confirmes ta présence ? Réponds OUI ou NON (avant vendredi 20:00).\n🕒 Créneau : dispo de 14h à 16h, dispo de 16h à 18h",
       "C'est noté, merci !",
-      '✅ Nous vous confirmons votre participation à : BP – samedi 28/11 à 14:00 – Entrepôt. Merci et à demain !',
+      '✅ Nous vous confirmons votre participation à : BP – samedi 28/11 à 14:00 – Entrepôt. Merci et à demain !\n🕒 Créneau : dispo de 14h à 16h, dispo de 16h à 18h',
     ]);
 
     // Alice (déjà connue) : jamais de demande de nom ; deux demandes de confirmation, un accusé
@@ -159,14 +167,14 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
       'A-0001 Maraude : Liste publiée',
       'A-0002 BP : Liste publiée',
     ]);
-    expect(env.tableur.lignes('Inscriptions').map((i) => `${i['Action ID']} ${i.Nom} : ${i.Statut}`)).toEqual([
+    expect(env.tableur.lignes('Inscriptions').map((i) => `${i['Action ID']} ${i.Nom} : ${i.Statut}${i.Créneau ? ` [${i.Créneau}]` : ''}`)).toEqual([
       'A-0001 Durand Bob : Désisté',
       'A-0001 Martin Alice : Sans réponse',
       'A-0001 Chloé : Retiré',
-      'A-0002 Durand Bob : Confirmé',
-      'A-0002 Martin Alice : Désisté',
-      'A-0002 David : Sans réponse',
-      'A-0002 Emma : Confirmé',
+      'A-0002 Durand Bob : Confirmé [dispo de 14h à 16h, dispo de 16h à 18h]',
+      'A-0002 Martin Alice : Désisté [dispo de 14h à 16h]',
+      'A-0002 David : Sans réponse [dispo de 16h à 18h]',
+      'A-0002 Emma : Confirmé [dispo de 16h à 18h]',
     ]);
 
     // Les bénévoles : Bob a donné son nom ; les nouveaux sans réponse gardent leur nom WhatsApp

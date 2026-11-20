@@ -123,7 +123,7 @@ async function envoyerUneDemande(
   ctx: Contexte, action: Action, inscription: Inscription, benevole: Benevole | undefined, parametres: Parametres,
 ): Promise<ChangementsInscription> {
   try {
-    const demandeId = await ctx.messagerie.envoyerTexte(inscription.telephone, texteDemandeConfirmation(action, benevole, parametres));
+    const demandeId = await ctx.messagerie.envoyerTexte(inscription.telephone, texteDemandeConfirmation(action, benevole, parametres, inscription.creneau));
     return { statut: STATUT_INSCRIPTION.EN_ATTENTE, demandeId };
   } catch (erreur) {
     ctx.logger.avertissement(
@@ -149,8 +149,13 @@ export async function demanderConfirmationMaintenant(
   }
 }
 
-/** Le texte de la demande, à partir du modèle TEXTE_CONFIRMATION des Paramètres. */
-export function texteDemandeConfirmation(action: Action, benevole: Benevole | undefined, parametres: Parametres): string {
+/**
+ * Le texte de la demande, à partir du modèle TEXTE_CONFIRMATION des Paramètres.
+ * Si la personne a choisi un ou des créneaux, ils sont ajoutés à la fin (quel que soit le modèle).
+ */
+export function texteDemandeConfirmation(
+  action: Action, benevole: Benevole | undefined, parametres: Parametres, creneau = '',
+): string {
   const veille = ajouterJours(action.date, -1);
   const texte = remplirModele(parametres.textes.confirmation, {
     prenom: benevole ? prenomPourMessage(benevole) : '',
@@ -160,7 +165,12 @@ export function texteDemandeConfirmation(action: Action, benevole: Benevole | un
     lieu: action.lieu,
     limite: `${jourSemaine(veille)} ${parametres.heureListe}`, // ex. « vendredi 20:00 »
   });
-  return texte.replace(/ {2,}/g, ' '); // « Bonjour  👋 » (prénom inconnu) → « Bonjour 👋 »
+  return avecCreneau(texte.replace(/ {2,}/g, ' '), creneau); // « Bonjour  👋 » (prénom inconnu) → « Bonjour 👋 »
+}
+
+/** Ajoute « Créneau : … » à la fin d'un message, si la personne a choisi un créneau. */
+export function avecCreneau(texte: string, creneau: string): string {
+  return creneau ? `${texte}\n🕒 Créneau : ${creneau}` : texte;
 }
 
 /** Inscriptions bloquées avec le marqueur : le bot s'est arrêté en plein envoi. Un humain vérifie. */

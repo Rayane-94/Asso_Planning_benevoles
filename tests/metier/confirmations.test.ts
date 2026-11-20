@@ -5,6 +5,7 @@
 import { describe, expect, test } from 'vitest';
 import { envoyerConfirmations } from '../../src/metier/confirmations.ts';
 import { recevoirMessage } from '../../src/metier/reception.ts';
+import { recevoirVote } from '../../src/metier/votes.ts';
 import { lireActions } from '../../src/sheets/actions.ts';
 import { lireParametres } from '../../src/sheets/parametres.ts';
 import { GROUPE_TEST } from '../faux/fausseMessagerie.ts';
@@ -223,14 +224,14 @@ describe('réponses en privé', () => {
   });
 });
 
-describe('OUI tardif dans le groupe (après l\'envoi des confirmations)', () => {
+describe('vote tardif dans le sondage (après l\'envoi des confirmations)', () => {
   test('nouvel inscrit : sa demande de confirmation part tout de suite', async () => {
     const env = await preparer();
     await env.planificateur.tick(); // jeudi 10:00 : demandes envoyées
     env.horloge.avancer({ heures: 2 });
 
     const CHLOE = '33655555555';
-    await recevoirMessage(env.ctx, env.messagerie.recu({ de: CHLOE, nom: 'Chloé', texte: 'oui', groupe: GROUPE_TEST, cite: ANNONCE_BP }));
+    await recevoirVote(env.ctx, env.messagerie.vote({ de: CHLOE, nom: 'Chloé', sondage: ANNONCE_BP, choix: ['dispo !!'] }));
 
     const recus = env.messagerie.envoyesA(CHLOE).map((m) => m.texte);
     expect(recus[0]).toContain('Tu confirmes ta présence ?');
@@ -238,14 +239,13 @@ describe('OUI tardif dans le groupe (après l\'envoi des confirmations)', () => 
     expect(env.tableur.lignes('Inscriptions').find((l) => l.Téléphone === '06 55 55 55 55')?.Statut).toBe('En attente');
   });
 
-  test('Désisté qui redit OUI dans le groupe : réinscrit, nouvelle demande envoyée', async () => {
+  test('Désisté qui revote « dispo » dans le sondage : réinscrit, nouvelle demande envoyée', async () => {
     const env = await preparer();
     await env.planificateur.tick();
     await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'non' })); // Désisté en privé
     env.messagerie.envoyes.length = 0;
 
-    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, nom: 'Bob', texte: 'je peux finalement, oui', groupe: GROUPE_TEST, cite: ANNONCE_BP }));
-    // « je peux finalement, oui » : contient « oui » et pas de NON → OUI
+    await recevoirVote(env.ctx, env.messagerie.vote({ de: BOB, nom: 'Bob', sondage: ANNONCE_BP, choix: ['dispo !!'] }));
     expect(env.messagerie.envoyesA(BOB)[0].texte).toBe(DEMANDE_BOB);
     expect(statuts(env)[0]).toBe('Durand Bob : En attente');
   });

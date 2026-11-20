@@ -51,6 +51,27 @@ export interface EtatConnexion {
 }
 
 /**
+ * Un vote dans un sondage, au format commun à tous les fournisseurs.
+ * IMPORTANT : `choix` contient TOUS les choix actuellement cochés par la personne (pas seulement
+ * le dernier clic) ; une liste vide = elle a retiré son vote (constaté au spike du 20/11/2026).
+ */
+export interface VoteRecu {
+  /** ID unique de ce vote (sert à ignorer les doublons). */
+  id: string;
+  /** ID du sondage concerné (celui renvoyé par envoyerSondage). */
+  sondageId: string;
+  /** Conversation où se trouve le sondage (ID du groupe). */
+  discussionId: string;
+  /** Numéro de la personne qui vote, E.164 sans « + » ; null si WhatsApp le masque. */
+  telephone: string | null;
+  idBrut: string;
+  nomWhatsApp: string;
+  /** Libellés des choix cochés, ex. ['dispo de 10h à 13h', 'dispo de 13h à 16h'] ; [] = vote retiré. */
+  choix: string[];
+  date: Date;
+}
+
+/**
  * Un message reçu, au format commun à tous les fournisseurs.
  * La réception arrive par webhook : l'adaptateur transforme le JSON du fournisseur en MessageRecu.
  */

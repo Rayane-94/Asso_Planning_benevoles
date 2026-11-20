@@ -355,7 +355,7 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
    - Événement `session.status` : STARTING → SCAN_QR_CODE → WORKING (utile pour la surveillance).
    - Non testé : l'ENVOI par l'API (format de la réponse de `sendText`) → vérifié pendant l'étape 5. Consommation sur ARM → au bloc 5.
 
-7b. **OUI sans citation dans le groupe** (compromis validé le 19/11/2026) : un message **court** (≤ 3 mots) détecté comme OUI, **sans citation**, est accepté **s'il n'y a qu'une seule action ouverte** (Annoncée ou Confirmations envoyées, pas encore passée) ; le bot inscrit et envoie en privé « ✅ C'est noté, tu es inscrit(e) pour … Si ce n'était pas pour ça, réponds NON. » (sauf si la demande de confirmation part déjà). S'il y a **plusieurs** actions ouvertes : pas d'inscription, message privé demandant de citer l'annonce. Un NON sans citation dans le groupe reste ignoré (trop ambigu en conversation) ; un **NON en privé** d'un « Inscrit » (avant les confirmations) le retire.
+7b. ~~**OUI sans citation dans le groupe**~~ — **remplacé le 20/11/2026 par le sondage seul (S3)** : les messages texte du groupe sont désormais tous ignorés. Seul reste valable : un **NON en privé** d'un « Inscrit » (avant les confirmations) le retire. Ancienne règle, pour mémoire (compromis validé le 19/11/2026) : un message **court** (≤ 3 mots) détecté comme OUI, **sans citation**, est accepté **s'il n'y a qu'une seule action ouverte** (Annoncée ou Confirmations envoyées, pas encore passée) ; le bot inscrit et envoie en privé « ✅ C'est noté, tu es inscrit(e) pour … Si ce n'était pas pour ça, réponds NON. » (sauf si la demande de confirmation part déjà). S'il y a **plusieurs** actions ouvertes : pas d'inscription, message privé demandant de citer l'annonce. Un NON sans citation dans le groupe reste ignoré (trop ambigu en conversation) ; un **NON en privé** d'un « Inscrit » (avant les confirmations) le retire.
 1. **Migration vers TypeScript** : `package.json`, `tsconfig.json` (strict), Vitest, scripts `npm run verifier` (types + tests), CI mise à jour ; suppression des fichiers Apps Script (`appsscript.json`, clasp, harness Google) ; portage des utilitaires (dates, téléphones, textes, détection oui/non) et de leurs tests.
 2. **Configuration** : `config.ts` (lecture et vérification du `.env`, message clair si une variable manque), `constantes.ts`, `.env.example`, logger console.
 3. **Ports et faux** : interfaces `Messagerie`, `Horloge`, `Tableur` ; faux en mémoire pour les tests (faux Sheet, fausse messagerie, horloge contrôlée).
@@ -398,7 +398,13 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
   - **Décisions (20/11/2026)** : **sondage seul** (plus d'inscription par « OUI » en texte dans le groupe ; les réponses en privé restent en texte) ; **plusieurs créneaux par personne** (inscrite une fois, colonne Créneau = « créneau 1, créneau 2 », visible sur chaque créneau dans la liste finale).
   - **S1 fait** (Sheet) : colonne verte **Créneaux** (Actions, ≤ 11 créneaux, pas de doublon), colonne **Créneau** (Inscriptions, Présents, Absents), paramètres `OPTION_DISPO` (« dispo !! ») et `OPTION_PAS_DISPO` (« pas dispo :/ »), nouveau `TEXTE_ANNONCE` (« 👇 Votez dans le sondage ci-dessous ») ; l'installation remplace l'ancien texte d'annonce seulement s'il n'a pas été personnalisé (`ANCIENNES_VALEURS_PAR_DEFAUT`).
   - **S2 fait** : l'annonce = TEXTE_ANNONCE puis, 2 s après, le **sondage** (question « {type} – {date} à {heure} » ; créneaux + « pas dispo », plusieurs réponses si ≥ 2 créneaux ; sinon « dispo » / « pas dispo », une réponse) ; l'action garde l'**ID du sondage** dans Message ID ; si le texte part mais pas le sondage → pas de renvoi automatique (marqueur conservé, erreur claire au Journal). Contrat `Messagerie.envoyerSondage`.
-  - **S3 (prévu)** : votes → inscriptions, retrait de l'inscription par « OUI » dans le groupe, créneaux dans confirmations / liste / récap, tests (dont la quinzaine).
+  - **S3 fait** : les votes deviennent des inscriptions (`src/metier/votes.ts`, logique commune dans `src/metier/inscription.ts`) ; plus aucune inscription par texte dans le groupe (`reception.ts` ignore tout message de groupe, sans même lire le Sheet).
+    - Vote = état complet : créneau(x) coché(s) → inscrit(e), colonne Créneau = « c1, c2 » (ordre du sondage) ; « dispo » → inscrit(e) sans créneau ; « pas dispo » ou `[]` → Retiré (Désisté si déjà En attente / Confirmé). Un créneau ET « pas dispo » cochés : le créneau l'emporte.
+    - Changement de créneau d'un Inscrit / En attente / Confirmé : statut gardé, créneau mis à jour (« Créneau modifié » au Journal). Un Retiré garde son dernier créneau (on voit quel créneau a perdu quelqu'un).
+    - Vote après l'envoi des confirmations → demande de confirmation immédiate (comme l'ancien « OUI » tardif). Vote sur une action Annulée / Liste publiée, autre groupe, sondage inconnu → ignoré (info Journal). Numéro masqué → avertissement.
+    - Anti-doublon par ID de vote + horodatage du dernier vote par (sondage, personne) dans `data/etat.json` (clé `votes:<sondage>`) : un vote plus ancien arrivé en retard est ignoré. `poll.vote.failed` → avertissement au Journal.
+    - Créneaux affichés : ligne « 🕒 Créneau : … » dans la demande de confirmation et la validation finale ; liste finale regroupée par créneau (une personne sur 2 créneaux apparaît 2 fois ; créneau inconnu → listé à la fin) ; récap « 2 confirmés (c1 : 1, c2 : 2) ».
+    - Tests : `votes.test.ts`, `creneaux.test.ts`, `convertirWebhookVote` (exemple anonymisé `voteSondage`), routage des votes dans le serveur, quinzaine réécrite avec des votes (BP à 2 créneaux).
 
 ### Améliorations prévues (après la mise en service)
 
@@ -413,7 +419,7 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 ## 8. Critères de réussite
 
 - [ ] Le référent ne fait que remplir l'onglet **Actions** et vérifier **Présents/Absents**.
-- [ ] Les bénévoles n'ont qu'à répondre **OUI** à l'annonce, puis **OUI** à la confirmation.
+- [ ] Les bénévoles n'ont qu'à **voter dans le sondage** de l'annonce, puis répondre **OUI** à la confirmation.
 - [ ] **Aucun doublon** de message, même si le bot redémarre ou si WAHA renvoie un webhook.
 - [ ] On change de fournisseur WhatsApp en écrivant un nouvel adaptateur, **sans toucher au code métier**.
 - [ ] Tout tourne sur le VPS gratuit ; aucun secret dans le repo.
