@@ -388,6 +388,13 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
   - Côté WAHA : `POST /api/sendPoll` (envoi) et événement `poll.vote` (votes, y compris changement ou retrait de vote) — présents dans WAHA 2026.10.1, **support par le moteur GOWS à vérifier**.
   - Vote pour un créneau → inscription (avec le créneau) ; « pas dispo » ou vote retiré → Retiré ; le « OUI » cité reste en secours.
   - Étapes : **spike sondages** (groupe de test, puis communauté de test) → adaptateur (envoi + votes) → code métier (créneaux partout). Estimation : 2 à 3 étapes.
+  - **Spike sondages (20/11/2026, groupe de test, GOWS) — concluant** :
+    - `POST /api/sendPoll` `{ session, chatId, poll: { name, options, multipleAnswers } }` → ID long ; ID court du sondage = 3e morceau (ex. `3EB06AE4…`).
+    - Événement `poll.vote` : `payload.vote.selectedOptions` = **libellés en clair** (WAHA déchiffre) ; `payload.poll.id` = ID du sondage (court au 3e morceau, aussi dans `_data.Message.pollUpdateMessage.pollCreationMessageKey.ID`) ; vrai numéro dans `_data.Info.SenderAlt`, nom dans `PushName`.
+    - **Chaque vote = l'état COMPLET des choix** de la personne (ajout d'un créneau → les deux ; décocher tout → `[]`). Donc : créneaux cochés → inscrit(e) sur ces créneaux ; `[]` ou « pas dispo » → Retiré.
+    - Plusieurs votes peuvent arriver dans la même seconde → garder l'horodatage du dernier vote par (sondage, personne) et ignorer un vote plus ancien.
+    - Les votes du compte du bot arrivent aussi (`vote.fromMe = true`) → à ignorer.
+    - Pas de `poll.vote.failed` observé. Reste à tester : **dans une communauté** (canal d'annonces).
 
 ### Améliorations prévues (après la mise en service)
 
