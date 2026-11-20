@@ -210,12 +210,15 @@ Lecture des réponses en privé :
    ✅ Nous vous confirmons votre participation à : Maraude – mardi 25/11 à 19:00 – Gare de Lyon. Merci et à demain !
    ```
 
-3. **Liste finale dans le groupe**, au format hyper simple, une ligne par présent :
+3. **Liste finale dans le groupe**, format « titre + liste » (décidé le 21/11/2026, remplace « une ligne par présent ») :
 
    ```text
-   Maraude – 25/11 – Durand Bob – 06 12 34 56 78
-   Maraude – 25/11 – Martin Alice – 06 11 22 33 44
+   📋 Maraude – mardi 25/11 à 19:00 – Gare de Lyon
+   • Durand Bob – 06 12 34 56 78
+   • Martin Alice – 06 11 22 33 44
    ```
+
+   Avec des créneaux : un bloc « 🕒 créneau » par créneau (ordre du sondage), les présents en dessous ; une personne sur deux créneaux est dans les deux ; créneau vide → « ⚠️ personne » ; créneau inconnu (renommé après le vote) → bloc « 🕒 autre créneau » à la fin.
 
    - Seuls les confirmés apparaissent. Les personnes sans réponse ou désistées sont retirées de la liste finale, mais restent visibles dans l'onglet **Absents** du Sheet.
    - S'il n'y a aucun confirmé : `⚠️ Maraude – 25/11 : personne n'a confirmé. Si tu peux venir, contacte le référent.`
@@ -405,6 +408,11 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
     - Anti-doublon par ID de vote + horodatage du dernier vote par (sondage, personne) dans `data/etat.json` (clé `votes:<sondage>`) : un vote plus ancien arrivé en retard est ignoré. `poll.vote.failed` → avertissement au Journal.
     - Créneaux affichés : ligne « 🕒 Créneau : … » dans la demande de confirmation et la validation finale ; liste finale regroupée par créneau (une personne sur 2 créneaux apparaît 2 fois ; créneau inconnu → listé à la fin) ; récap « 2 confirmés (c1 : 1, c2 : 2) ».
     - Tests : `votes.test.ts`, `creneaux.test.ts`, `convertirWebhookVote` (exemple anonymisé `voteSondage`), routage des votes dans le serveur, quinzaine réécrite avec des votes (BP à 2 créneaux).
+    - Corrigé au test réel (20/11) : un créneau « pas dispo » écrit par le référent dans Créneaux est ignoré (`veutDirePasDispo`), sinon le voter réinscrivait la personne.
+  - **Décisions (21/11/2026), après le test réel** :
+    - **S4 fait** : liste finale au format « titre + liste » (voir §4.5).
+    - **S5 (prévu)** : quand une commande n'envoie rien, la colonne Résultat explique pourquoi (ex. « aucune action dans les 2 prochains jours, prochaine : … »).
+    - **S6 (prévu)** : demande de confirmation à J-2 = texte + **sondage privé** « ✅ Oui, je serai là » / « ❌ Non, je ne peux plus » (modifiables dans Paramètres) ; le OUI / NON écrit reste accepté en secours ; chaque sondage est lié à une inscription (plus d'ambiguïté « plusieurs demandes »). Sondages en conversation privée **jamais testés en réel** → à vérifier.
 
 ### Améliorations prévues (après la mise en service)
 

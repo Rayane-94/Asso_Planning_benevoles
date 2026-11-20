@@ -43,8 +43,9 @@ describe('vendredi 20:00 : liste finale du BP de samedi', () => {
     const env = await preparer();
     await env.planificateur.tick();
     expect(env.messagerie.envoyesA(GROUPE_TEST).map((m) => m.texte)).toEqual([
-      'BP – 28/11 – Durand Bob – 06 12 34 56 78\n' +
-      'BP – 28/11 – Martin Alice – 06 11 22 33 44',
+      '📋 BP – samedi 28/11 à 14:00 – Entrepôt\n' +
+      '• Durand Bob – 06 12 34 56 78\n' +
+      '• Martin Alice – 06 11 22 33 44',
     ]);
   });
 
@@ -121,7 +122,7 @@ describe('le bon moment', () => {
     const ligne = lignes.find((l) => l.valeurs.Paramètre === 'HEURE_LISTE');
     await env.tableur.modifierLignes('Paramètres', [{ numero: ligne?.numero ?? 0, valeurs: { Valeur: '21:00' } }]);
     // À 21:00 le récap du vendredi (20:30) part aussi : on ne compte que la liste.
-    const listes = () => env.messagerie.envoyesA(GROUPE_TEST).filter((m) => m.texte.startsWith('BP – 28/11'));
+    const listes = () => env.messagerie.envoyesA(GROUPE_TEST).filter((m) => m.texte.startsWith('📋 BP'));
     await env.planificateur.tick();
     expect(listes()).toEqual([]);
     env.horloge.regler('2026-11-27 21:00');

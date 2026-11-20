@@ -123,11 +123,11 @@ describe('une quinzaine complète, du lundi 16 au vendredi 27 novembre', () => {
       '📅 Récap de la semaine (samedi 21/11 → vendredi 27/11)\n• Maraude – mercredi 25/11 à 19:00 – Gare de Lyon : 2 inscrits',
       '📣 BP – samedi 28/11 à 14:00 – Entrepôt\n👇 Votez dans le sondage ci-dessous pour participer.',
       'BP – samedi 28/11 à 14:00', // le sondage
-      'Maraude – 25/11 – Durand Bob – 06 12 34 56 78',
-      // la liste du BP est regroupée par créneau ; Bob apparaît sur les deux
-      'BP – 28/11 – dispo de 14h à 16h – Durand Bob – 06 12 34 56 78\n' +
-        'BP – 28/11 – dispo de 16h à 18h – Durand Bob – 06 12 34 56 78\n' +
-        'BP – 28/11 – dispo de 16h à 18h – Emma – 06 55 55 55 55',
+      '📋 Maraude – mercredi 25/11 à 19:00 – Gare de Lyon\n• Durand Bob – 06 12 34 56 78',
+      // la liste du BP : un bloc par créneau ; Bob apparaît dans les deux
+      '📋 BP – samedi 28/11 à 14:00 – Entrepôt\n\n' +
+        '🕒 dispo de 14h à 16h\n• Durand Bob – 06 12 34 56 78\n\n' +
+        '🕒 dispo de 16h à 18h\n• Durand Bob – 06 12 34 56 78\n• Emma – 06 55 55 55 55',
       '📅 Récap de la semaine (samedi 28/11 → vendredi 04/12)\n• BP – samedi 28/11 à 14:00 – Entrepôt : 2 confirmés (dispo de 14h à 16h : 1, dispo de 16h à 18h : 2)',
     ]);
 

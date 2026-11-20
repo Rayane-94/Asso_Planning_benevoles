@@ -33,26 +33,48 @@ const BOB = inscription('Durand Bob', '33612345678', `${MATIN}, ${APREM}`);
 const ALICE = inscription('Martin Alice', '33611223344', APREM);
 
 describe('liste finale', () => {
-  test('sans créneaux : une ligne par confirmé, comme avant', () => {
+  test('sans créneaux : le titre, puis une ligne par confirmé', () => {
     expect(texteListe(action([]), [inscription('Durand Bob', '33612345678', '')])).toBe(
-      'BP – 28/11 – Durand Bob – 06 12 34 56 78',
+      '📋 BP – samedi 28/11 à 10:00 – Entrepôt\n• Durand Bob – 06 12 34 56 78',
     );
   });
 
-  test('avec créneaux : regroupée par créneau (ordre du sondage), une personne sur 2 créneaux apparaît 2 fois', () => {
+  test('avec créneaux : un bloc par créneau (ordre du sondage), une personne sur 2 créneaux est dans les 2', () => {
     expect(texteListe(action([MATIN, APREM]), [ALICE, BOB])).toBe([
-      'BP – 28/11 – dispo de 10h à 13h – Durand Bob – 06 12 34 56 78',
-      'BP – 28/11 – dispo de 13h à 16h – Martin Alice – 06 11 22 33 44',
-      'BP – 28/11 – dispo de 13h à 16h – Durand Bob – 06 12 34 56 78',
+      '📋 BP – samedi 28/11 à 10:00 – Entrepôt',
+      '',
+      '🕒 dispo de 10h à 13h',
+      '• Durand Bob – 06 12 34 56 78',
+      '',
+      '🕒 dispo de 13h à 16h',
+      '• Martin Alice – 06 11 22 33 44',
+      '• Durand Bob – 06 12 34 56 78',
+    ].join('\n'));
+  });
+
+  test('créneau sans aucun confirmé : « ⚠️ personne » (l\'équipe voit tout de suite le trou)', () => {
+    expect(texteListe(action([MATIN, APREM]), [ALICE])).toBe([
+      '📋 BP – samedi 28/11 à 10:00 – Entrepôt',
+      '',
+      '🕒 dispo de 10h à 13h',
+      '⚠️ personne',
+      '',
+      '🕒 dispo de 13h à 16h',
+      '• Martin Alice – 06 11 22 33 44',
     ].join('\n'));
   });
 
   test('créneau inconnu (renommé dans Actions après le vote) : la personne est listée quand même, à la fin', () => {
     const chloe = inscription('Chloé', '33633333333', 'dispo de 9h à 12h');
-    expect(texteListe(action([MATIN, APREM]), [chloe, ALICE]).split('\n')).toEqual([
-      'BP – 28/11 – dispo de 13h à 16h – Martin Alice – 06 11 22 33 44',
-      'BP – 28/11 – dispo de 9h à 12h – Chloé – 06 33 33 33 33',
+    expect(texteListe(action([APREM]), [chloe, ALICE]).split('\n\n')).toEqual([
+      '📋 BP – samedi 28/11 à 10:00 – Entrepôt',
+      '🕒 dispo de 13h à 16h\n• Martin Alice – 06 11 22 33 44',
+      '🕒 autre créneau\n• Chloé – 06 33 33 33 33 (dispo de 9h à 12h)',
     ]);
+  });
+
+  test('sans lieu : titre sans « – lieu »', () => {
+    expect(texteListe({ ...action([]), lieu: '' }, [ALICE]).split('\n')[0]).toBe('📋 BP – samedi 28/11 à 10:00');
   });
 
   test('personne : avertissement, avec ou sans créneaux', () => {

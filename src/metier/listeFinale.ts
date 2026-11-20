@@ -4,9 +4,11 @@
  * Pour chaque action « Confirmations envoyées » qui a lieu demain :
  *   1. « En attente » → « Sans réponse » (ils iront dans l'onglet Absents) ;
  *   2. l'action passe à « Liste publiée » (plus aucun changement automatique ensuite) ;
- *   3. liste des confirmés dans le groupe, une ligne par personne :
- *        BP – 28/11 – Durand Bob – 06 12 34 56 78
- *      ou, si personne : ⚠️ BP – 28/11 : personne n'a confirmé…
+ *   3. liste des confirmés dans le groupe : un titre, puis une ligne par personne
+ *        📋 BP – samedi 28/11 à 14:00 – Entrepôt
+ *        • Durand Bob – 06 12 34 56 78
+ *      avec des créneaux : un bloc « 🕒 dispo de 10h à 13h » par créneau, les présents en dessous ;
+ *      si personne : ⚠️ BP – 28/11 : personne n'a confirmé…
  *   4. message privé « ✅ Nous vous confirmons votre participation… » à chaque confirmé.
  *
  * Anti-doublon : le statut « Liste publiée » est écrit AVANT l'envoi de la liste. Si l'envoi
@@ -126,34 +128,41 @@ async function publierUneListe(
 }
 
 /**
- * Le texte de la liste, au format volontairement minimaliste (une ligne par présent).
- *   - sans créneaux : « BP – 28/11 – Durand Bob – 06 12 34 56 78 »
- *   - avec créneaux : regroupée par créneau (dans l'ordre du sondage) ; une personne inscrite
- *     sur deux créneaux apparaît sur les deux :
- *       « BP – 28/11 – dispo de 10h à 13h – Durand Bob – 06 12 34 56 78 »
+ * Le texte de la liste (format « titre + liste », choisi le 21/11/2026) :
+ *
+ *   📋 BP – samedi 28/11 à 10:00 – Entrepôt      (titre)
+ *
+ *   🕒 dispo de 10h à 13h                        (un bloc par créneau, ordre du sondage ;
+ *   • Durand Bob – 06 12 34 56 78                 une personne sur deux créneaux est dans les deux)
+ *
+ *   🕒 dispo de 13h à 16h
+ *   ⚠️ personne                                   (créneau sans aucun confirmé)
+ *
+ * Sans créneaux : le titre puis directement les « • Nom – téléphone ».
  * Exportée pour les tests.
  */
 export function texteListe(action: Action, confirmes: Inscription[]): string {
-  const jour = dateCourte(action.date);
   if (confirmes.length === 0) {
-    return `⚠️ ${action.type} – ${jour} : personne n'a confirmé. Si tu peux venir, contacte le référent.`;
+    return `⚠️ ${action.type} – ${dateCourte(action.date)} : personne n'a confirmé. Si tu peux venir, contacte le référent.`;
   }
-  const ligne = (inscription: Inscription, creneau?: string) =>
-    [action.type, jour, creneau, inscription.nom, formaterTelephone(inscription.telephone)].filter(Boolean).join(' – ');
+  const lieu = action.lieu ? ` – ${action.lieu}` : '';
+  const titre = `📋 ${action.type} – ${dateLongue(action.date)} à ${action.heure}${lieu}`;
+  const puces = (personnes: Inscription[]) =>
+    personnes.map((inscription) => `• ${inscription.nom} – ${formaterTelephone(inscription.telephone)}`);
 
-  if (action.creneaux.length === 0) return confirmes.map((inscription) => ligne(inscription)).join('\n');
+  // Sans créneaux : le titre, puis une ligne par présent.
+  if (action.creneaux.length === 0) return [titre, ...puces(confirmes)].join('\n');
 
-  const lignes: string[] = [];
-  for (const creneau of action.creneaux) {
-    for (const inscription of confirmes) {
-      if (lireCreneaux(inscription.creneau).includes(creneau)) lignes.push(ligne(inscription, creneau));
-    }
-  }
-  // Confirmés sans créneau reconnu (ex. créneau renommé après le vote) : listés quand même, à la fin.
-  for (const inscription of confirmes) {
-    if (!lireCreneaux(inscription.creneau).some((c) => action.creneaux.includes(c))) lignes.push(ligne(inscription, inscription.creneau || undefined));
-  }
-  return lignes.join('\n');
+  // Avec créneaux : un bloc par créneau, dans l'ordre du sondage (une personne peut être dans plusieurs).
+  const blocs = action.creneaux.map((creneau) => {
+    const presents = confirmes.filter((inscription) => lireCreneaux(inscription.creneau).includes(creneau));
+    return [`🕒 ${creneau}`, ...(presents.length > 0 ? puces(presents) : ['⚠️ personne'])].join('\n');
+  });
+  // Confirmés sans créneau reconnu (ex. créneau renommé dans Actions après le vote) : listés quand même, à la fin.
+  const autres = confirmes.filter((inscription) => !lireCreneaux(inscription.creneau).some((c) => action.creneaux.includes(c)));
+  if (autres.length > 0) blocs.push(['🕒 autre créneau', ...autres.map((i) => `• ${i.nom} – ${formaterTelephone(i.telephone)}${i.creneau ? ` (${i.creneau})` : ''}`)].join('\n'));
+
+  return [titre, ...blocs].join('\n\n');
 }
 
 /**
