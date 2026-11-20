@@ -20,7 +20,7 @@ import { lireActions, modifierAction, type Action } from '../sheets/actions.ts';
 import { lireBenevoles, prenomPourMessage, type Benevole } from '../sheets/benevoles.ts';
 import { lireInscriptions, modifierInscriptions, type ChangementsInscription, type Inscription } from '../sheets/inscriptions.ts';
 import type { Parametres } from '../sheets/parametres.ts';
-import { ajouterJours, cleDate, dateLongue, ecartJours, heureDe, jourSemaine } from '../utils/dates.ts';
+import { ajouterJours, cleDate, dateCourte, dateLongue, ecartJours, heureDe, jourSemaine } from '../utils/dates.ts';
 import { formaterTelephone } from '../utils/telephones.ts';
 import { remplirModele } from '../utils/textes.ts';
 import { estDansLaFenetre } from './annonces.ts';
@@ -83,6 +83,35 @@ export function actionsAConfirmer(
       return ecart > 1 && ecart < joursAvant; // rattrapage (si JOURS_AVANT_CONFIRMATION > 2)
     })
     .sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+}
+
+/**
+ * Pourquoi la commande « Envoyer les confirmations maintenant » n'a rien envoyé
+ * (texte de la colonne Résultat, pour que le référent comprenne sans appeler personne).
+ * À appeler AVANT l'envoi, avec les actions telles qu'elles étaient.
+ *   ex. « BP (24/11) : trop tôt, demandes possibles à partir du 22/11 »
+ */
+export function expliquerAucuneConfirmation(actions: Action[], aujourdhui: string, parametres: Parametres): string {
+  const joursAvant = parametres.joursAvantConfirmation;
+  // Des actions étaient bien dans la période : c'est qu'il n'y avait personne à qui écrire.
+  const concernees = actionsAConfirmer(actions, aujourdhui, '12:00', parametres, 'commande');
+  if (concernees.length > 0) {
+    return concernees.map((a) => `${decrire(a)} : aucun bénévole « Inscrit » à qui écrire (personne n'a voté, ou demandes déjà envoyées)`).join(' ; ');
+  }
+  const annoncees = actions
+    .filter((a) => a.statut === STATUT_ACTION.ANNONCEE && ecartJours(aujourdhui, a.date) >= 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (annoncees.length === 0) {
+    return 'aucune action « Annoncée » à venir (rien n\'est annoncé, ou les demandes sont déjà parties)';
+  }
+  return annoncees.slice(0, 3).map((a) =>
+    `${decrire(a)} : trop tôt, demandes possibles à partir du ${dateCourte(ajouterJours(a.date, -joursAvant))}`,
+  ).join(' ; ');
+}
+
+/** « BP (24/11) » */
+export function decrire(action: Action): string {
+  return `${action.type} (${dateCourte(action.date)})`;
 }
 
 /** Envoie les demandes d'une action, espacées, et enregistre les résultats par paquets. */

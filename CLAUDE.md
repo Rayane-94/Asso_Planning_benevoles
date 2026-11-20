@@ -411,7 +411,7 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
     - Corrigé au test réel (20/11) : un créneau « pas dispo » écrit par le référent dans Créneaux est ignoré (`veutDirePasDispo`), sinon le voter réinscrivait la personne.
   - **Décisions (21/11/2026), après le test réel** :
     - **S4 fait** : liste finale au format « titre + liste » (voir §4.5).
-    - **S5 (prévu)** : quand une commande n'envoie rien, la colonne Résultat explique pourquoi (ex. « aucune action dans les 2 prochains jours, prochaine : … »).
+    - **S5 fait** : quand « Envoyer les confirmations maintenant » ou « Publier la liste de demain maintenant » n'envoie rien, la colonne Résultat explique pourquoi (`expliquerAucuneConfirmation`, `expliquerAucuneListe`, calculées sur l'état des actions AVANT la commande) : trop tôt (à partir de quelle date), personne d'inscrit, confirmations pas encore parties, liste déjà publiée, prochaine action.
     - **S6 (prévu)** : demande de confirmation à J-2 = texte + **sondage privé** « ✅ Oui, je serai là » / « ❌ Non, je ne peux plus » (modifiables dans Paramètres) ; le OUI / NON écrit reste accepté en secours ; chaque sondage est lié à une inscription (plus d'ambiguïté « plusieurs demandes »). Sondages en conversation privée **jamais testés en réel** → à vérifier.
 
 ### Améliorations prévues (après la mise en service)

@@ -18,9 +18,10 @@ import { cleDate, horodatage } from '../utils/dates.ts';
 import { decrireErreur } from '../utils/logger.ts';
 import { formaterTelephone } from '../utils/telephones.ts';
 import { expliquerAucuneAnnonce, publierAnnonces } from './annonces.ts';
-import { envoyerConfirmations } from './confirmations.ts';
+import type { Action } from '../sheets/actions.ts';
+import { envoyerConfirmations, expliquerAucuneConfirmation } from './confirmations.ts';
 import type { Contexte, DonneesDuTick } from './contexte.ts';
-import { publierListes } from './listeFinale.ts';
+import { expliquerAucuneListe, publierListes } from './listeFinale.ts';
 import { envoyerRecap } from './recap.ts';
 
 const CLE_PAUSE = 'pause';
@@ -48,6 +49,11 @@ export async function executerCommandes(ctx: Contexte, donnees: DonneesDuTick): 
   }
 }
 
+/** Copie des actions (statuts compris), pour expliquer un résultat d'après l'état AVANT la commande. */
+function copieDesActions(donnees: DonneesDuTick): Action[] {
+  return donnees.actions.map((action) => ({ ...action }));
+}
+
 /** Exécute UNE commande et renvoie le résultat à afficher. */
 async function executer(ctx: Contexte, donnees: DonneesDuTick, commande: string): Promise<string> {
   const maintenant = ctx.horloge.maintenant();
@@ -57,10 +63,18 @@ async function executer(ctx: Contexte, donnees: DonneesDuTick, commande: string)
       if (publiees > 0) return `${publiees} annonce(s) publiée(s)`;
       return `Aucune annonce publiée : ${expliquerAucuneAnnonce(donnees.actions, cleDate(maintenant), donnees.parametres)}`;
     }
-    case COMMANDES.CONFIRMATIONS:
-      return `${await envoyerConfirmations(ctx, donnees, 'commande')} demande(s) de confirmation envoyée(s)`;
-    case COMMANDES.LISTE:
-      return `${await publierListes(ctx, donnees, 'commande')} liste(s) publiée(s)`;
+    case COMMANDES.CONFIRMATIONS: {
+      const avant = copieDesActions(donnees); // l'envoi change les statuts : on explique d'après l'état de départ
+      const envoyees = await envoyerConfirmations(ctx, donnees, 'commande');
+      if (envoyees > 0) return `${envoyees} demande(s) de confirmation envoyée(s)`;
+      return `Aucune demande envoyée : ${expliquerAucuneConfirmation(avant, cleDate(maintenant), donnees.parametres)}`;
+    }
+    case COMMANDES.LISTE: {
+      const avant = copieDesActions(donnees);
+      const publiees = await publierListes(ctx, donnees, 'commande');
+      if (publiees > 0) return `${publiees} liste(s) publiée(s)`;
+      return `Aucune liste publiée : ${expliquerAucuneListe(avant, cleDate(maintenant))}`;
+    }
     case COMMANDES.RECAP:
       return (await envoyerRecap(ctx, donnees, 'commande')) ? 'Récap envoyé' : 'Pas de récap envoyé (voir le Journal)';
     case COMMANDES.VERIFIER:

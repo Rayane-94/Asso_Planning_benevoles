@@ -24,11 +24,11 @@ import { lireCreneaux, modifierAction, type Action } from '../sheets/actions.ts'
 import { lireBenevoles, prenomPourMessage, type Benevole } from '../sheets/benevoles.ts';
 import { lireInscriptions, modifierInscriptions, type Inscription } from '../sheets/inscriptions.ts';
 import type { Parametres } from '../sheets/parametres.ts';
-import { cleDate, dateCourte, dateLongue, ecartJours, heureDe } from '../utils/dates.ts';
+import { ajouterJours, cleDate, dateCourte, dateLongue, ecartJours, heureDe } from '../utils/dates.ts';
 import { formaterTelephone } from '../utils/telephones.ts';
 import { remplirModele } from '../utils/textes.ts';
 import { estDansLaFenetre } from './annonces.ts';
-import { avecCreneau } from './confirmations.ts';
+import { avecCreneau, decrire } from './confirmations.ts';
 import type { Contexte, DonneesDuTick } from './contexte.ts';
 
 export type ModeListe = 'automatique' | 'commande';
@@ -60,6 +60,36 @@ export async function publierListes(ctx: Contexte, donnees: DonneesDuTick, mode:
     if (await publierUneListe(ctx, ctx.groupeId, action, deCetteAction, parTelephone, parametres)) publiees++;
   }
   return publiees;
+}
+
+/**
+ * Pourquoi la commande « Publier la liste de demain maintenant » n'a rien publié
+ * (texte de la colonne Résultat). À appeler AVANT, avec les actions telles qu'elles étaient.
+ *   ex. « BP (22/11) : les demandes de confirmation ne sont pas encore parties… »
+ */
+export function expliquerAucuneListe(actions: Action[], aujourdhui: string): string {
+  const S = STATUT_ACTION;
+  const proches = actions
+    .filter((a) => a.statut !== S.ANNULEE && [0, 1].includes(ecartJours(aujourdhui, a.date)))
+    .sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+
+  if (proches.length === 0) {
+    const prochaine = actions
+      .filter((a) => a.statut !== S.ANNULEE && a.statut !== S.LISTE_PUBLIEE && ecartJours(aujourdhui, a.date) > 1)
+      .sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure))[0];
+    const suite = prochaine
+      ? ` (prochaine : ${decrire(prochaine)}, liste possible à partir du ${dateCourte(ajouterJours(prochaine.date, -1))})`
+      : '';
+    return `aucune action aujourd'hui ni demain${suite}`;
+  }
+  return proches.map((a) => {
+    switch (a.statut) {
+      case S.LISTE_PUBLIEE: return `${decrire(a)} : liste déjà publiée`;
+      case S.A_ANNONCER: return `${decrire(a)} : pas encore annoncée`;
+      case S.ANNONCEE: return `${decrire(a)} : les demandes de confirmation ne sont pas encore parties (lancer d'abord « Envoyer les confirmations maintenant »)`;
+      default: return `${decrire(a)} : non publiée, voir le Journal`;
+    }
+  }).join(' ; ');
 }
 
 /** Les actions dont il faut publier la liste maintenant (exportée pour les tests). */
