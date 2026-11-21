@@ -1,42 +1,101 @@
-# docker-compose.yml — Lance WAHA (l'API WhatsApp) dans un conteneur Docker.
+# docker-compose.yml — Lance TOUT le projet : WAHA (WhatsApp) + le bot, chacun dans son conteneur.
+# Le même fichier sert sur le PC (Docker Desktop) et sur le VPS Oracle.
 #
-#   docker compose up -d      → démarre (en arrière-plan)
-#   docker compose logs -f    → affiche ce qui se passe (Ctrl+C pour quitter l'affichage)
-#   docker compose down       → arrête
+#   docker compose up -d --build   → (re)construit l'image du bot et démarre tout, en arrière-plan
+#   docker compose logs -f bot     → affiche ce que fait le bot (Ctrl+C pour quitter l'affichage)
+#   docker compose ps              → état des conteneurs (« healthy » = le bot répond)
+#   docker compose down            → arrête tout (les données sont gardées)
+#
+# Scripts du bot, lancés DANS son conteneur :
+#   docker compose run --rm bot npm run lister-groupes
+#   docker compose run --rm bot npm run installer-sheet
 #
 # Les valeurs ${…} viennent du fichier .env (à la racine du projet).
-# Le même fichier servira sur le VPS Oracle (bloc 5), avec en plus le conteneur du bot.
+#
+# Réseau : les deux conteneurs se parlent sur un réseau privé créé par Docker : le bot joint
+# WAHA à http://waha:3000, WAHA joint le bot à http://bot:3000. Le bot n'est accessible
+# QUE depuis ce réseau ; seul le tableau de bord de WAHA est ouvert, et seulement à la
+# machine elle-même (127.0.0.1) : sur le VPS, on l'ouvre par un tunnel SSH.
+
+# Logs Docker : 3 fichiers de 10 Mo maximum par conteneur (sinon le disque du VPS finit plein).
+x-logs: &logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   waha:
-    image: devlikeapro/waha:latest
+    # ⚠️ Les images WAHA ne sont pas « universelles » : une pour les PC (Intel/AMD), une pour
+    # les machines ARM d'Oracle. Version fixée (celle qu'on a testée) : jamais « latest »,
+    # qui peut changer sans prévenir. Sur le VPS : WAHA_IMAGE=devlikeapro/waha:gows-arm-2026.10.1
+    image: ${WAHA_IMAGE:-devlikeapro/waha:gows-2026.10.1}
     container_name: waha
     restart: unless-stopped # redémarre tout seul après une panne ou un redémarrage du PC / serveur
     ports:
-      # Sur le PC : WAHA est joignable à http://localhost:3001 (le port 3000 est pris par le bot).
+      # Tableau de bord (scan du QR code) : http://localhost:3001/dashboard
       # « 127.0.0.1 » = accessible UNIQUEMENT depuis cette machine, jamais depuis Internet.
       - "127.0.0.1:3001:3000"
     environment:
       # Clé partagée avec le bot (même valeur que WAHA_API_KEY dans .env)
       WAHA_API_KEY: ${WAHA_API_KEY:?Remplir WAHA_API_KEY dans le .env}
-      # Tableau de bord (scan du QR code) : http://localhost:3001/dashboard
       WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
       WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD:?Remplir WAHA_DASHBOARD_PASSWORD dans le .env}
+      # La documentation de l'API (Swagger) est protégée par le même mot de passe
+      WHATSAPP_SWAGGER_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
+      WHATSAPP_SWAGGER_PASSWORD: ${WAHA_DASHBOARD_PASSWORD:?Remplir WAHA_DASHBOARD_PASSWORD dans le .env}
       # Moteur sans navigateur Chrome : léger, et disponible aussi sur les machines ARM d'Oracle
       WHATSAPP_DEFAULT_ENGINE: GOWS
       # La session « default » démarre toute seule et redémarre après une coupure
       WHATSAPP_START_SESSION: default
       WHATSAPP_RESTART_ALL_SESSIONS: "True"
-      # Où WAHA envoie les messages reçus (webhook). « host.docker.internal » = « le PC lui-même »
-      # vu depuis le conteneur : c'est là que tourne le bot (ou le script de spike) sur le port 3000.
-      WHATSAPP_HOOK_URL: ${WAHA_WEBHOOK_URL:-http://host.docker.internal:3000/webhook/waha}
+      # Où WAHA envoie les messages reçus (webhook) : le conteneur du bot.
+      # (Pour développer avec « npm start » hors de Docker, voir .env.example.)
+      WHATSAPP_HOOK_URL: ${WAHA_WEBHOOK_URL:-http://bot:3000/webhook/waha}
       # message = les messages REÇUS (pas ceux envoyés par le bot lui-même) ;
       # session.status = connexion / déconnexion de WhatsApp ;
       # poll.vote / poll.vote.failed = votes dans les sondages (et votes illisibles).
       WHATSAPP_HOOK_EVENTS: message,session.status,poll.vote,poll.vote.failed
     volumes:
-      # La session WhatsApp est gardée ici : sans ça, il faudrait rescanner le QR code à chaque redémarrage.
+      # La session WhatsApp est gardée ici : sans ça, il faudrait rescanner le QR code à chaque
+      # redémarrage. C'est CE dossier qu'il faut sauvegarder.
       - ./data/waha-sessions:/app/.sessions
     extra_hosts:
-      # Nécessaire sous Linux (VPS) pour que « host.docker.internal » fonctionne ; sans effet sous Windows/Mac.
+      # Pour le mode développement (bot lancé avec « npm start » sur le PC) ; sans effet sinon.
       - "host.docker.internal:host-gateway"
+    logging: *logs
+
+  bot:
+    # L'image est fabriquée à partir du Dockerfile de ce dossier (« --build » la reconstruit).
+    build: .
+    container_name: bot
+    restart: unless-stopped
+    # Un mini « init » transmet proprement l'arrêt (docker stop) au bot, qui finit son travail
+    # en cours avant de s'arrêter.
+    init: true
+    depends_on:
+      - waha
+    # Toute la configuration vient du .env…
+    env_file: .env
+    # … sauf ce qui est propre à Docker (prioritaire sur le .env, qui sert aussi en local) :
+    environment:
+      WAHA_URL: http://waha:3000
+      PORT: "3000"
+      DOSSIER_DONNEES: /app/data
+    volumes:
+      # La clé du compte de service Google, en LECTURE SEULE (jamais copiée dans l'image)
+      - ./secrets:/app/secrets:ro
+      # L'état du bot (messages déjà traités, récap déjà envoyé…) : un « volume » géré par
+      # Docker, qui survit aux redémarrages et aux mises à jour du bot.
+      - donnees-bot:/app/data
+    healthcheck:
+      # Toutes les minutes, Docker vérifie que le bot répond (« docker compose ps » → healthy).
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/sante').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    logging: *logs
+
+volumes:
+  donnees-bot:

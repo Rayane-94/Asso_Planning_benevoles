@@ -1,0 +1,15 @@
+# .dockerignore — Ce que Docker ne copie JAMAIS dans l'image du bot.
+# Surtout les secrets : ils sont donnés au conteneur au lancement (voir docker-compose.yml),
+# jamais enfermés dans l'image.
+.env
+.env.*
+secrets/
+data/
+
+# Inutile pour faire tourner le bot
+node_modules/
+tests/
+docs/
+.git/
+.github/
+*.md
