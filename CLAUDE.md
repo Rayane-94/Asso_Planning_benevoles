@@ -1,20 +1,20 @@
 # Projet : Bot planning bénévoles (WhatsApp + Google Sheet)
 
-> Ce fichier contient tout le contexte du projet. Il est à la racine du repo : Claude Code le lit automatiquement à chaque session.
+> Document d'ingénierie du projet : contexte, architecture, règles métier, décisions et plan de développement. Il sert de référence à toute personne (ou tout assistant de code) qui travaille sur le projet.
 >
 > **Version 3 (18/11/2026)** : le bot devient un **serveur Node.js + TypeScript** hébergé sur un **VPS Oracle Cloud (Always Free)**, à côté de **WAHA** (API WhatsApp open source auto-hébergée). Le Google Sheet reste l'interface de l'équipe.
 > Historique : v1 Telegram (abandonné) → v2 Google Apps Script + API WhatsApp hébergée payante (abandonné le 18/11/2026, voir §2) → v3.
 
 ---
 
-## 0. Mode de travail (à respecter)
+## 0. Critères à respecter
 
-- C'est moi (Rayane) qui commit. **Claude écrit les fichiers** et m'explique chaque bloc ; je relis, je teste et je commite. Tu m'accompagnes **étape par étape : une étape correspond à un commit**.
-- Explique les termes techniques (spike, webhook, adaptateur, Docker…) la première fois qu'ils apparaissent.
-- Avant chaque étape, explique brièvement ce qu'on fait et pourquoi. Ensuite, on code. Puis tu me proposes un message de commit (**Conventional Commits, en français**).
-- **Attends ma validation** avant de passer à l'étape suivante. Ne génère jamais tout le projet d'un coup.
-- Si une décision n'est pas couverte par ce fichier, **pose-moi la question** au lieu de deviner.
-- Le code doit rester lisible par un dev junior qui reprendrait le projet pour l'asso. **Commentaires en français.** Le projet est maintenu par Rayane et un ami.
+- **Bonnes pratiques** : code simple et lisible, commenté en français, pour que d'autres bénévoles puissent reprendre le projet. TypeScript en mode strict, tests à chaque fonctionnalité, CI verte avant de fusionner.
+- **Principes SOLID** : le code métier ne dépend pas directement de WhatsApp ni de Google ; il passe par des interfaces (ports et adaptateurs, voir §3.3). Un module = une responsabilité.
+- **Fiabilité** : aucun message envoyé en double, même si le bot redémarre. En cas de doute, le bot ne fait rien et l'écrit dans le Journal.
+- **Sécurité** : aucun secret dans le dépôt, rien d'exposé sur Internet, pas de vraies données personnelles dans les tests.
+- **Simplicité** : le moins de dépendances possible ; les réglages courants dans le Sheet, pas dans le code.
+- **Git** : Conventional Commits en français, une étape = un commit, une branche et une pull request par bloc.
 
 ---
 
@@ -42,7 +42,7 @@ L'accueil des nouveaux bénévoles : message automatique, transcription et résu
 - Format de la liste finale **volontairement minimaliste** (voir §4.5).
 - Les réglages courants (heures, textes) se font **dans le Sheet** (onglet Paramètres), jamais dans le code.
 - **Philosophie (validée le 19/11/2026)** : le bot automatise le cas normal ; les cas particuliers (changement de dernière minute, situation imprévue) sont gérés **à la main** par l'équipe et les bénévoles. Le bot ne devine jamais : en cas de doute, il ne fait rien et note dans le Journal.
-- **Tests réels** : Rayane testera d'abord avec **son numéro WhatsApp personnel** (risque de bannissement connu et accepté), avec un groupe de test séparé et un second testeur pour les réponses (les messages envoyés depuis le numéro du bot sont vus comme venant du bot). Le numéro dédié de l'asso viendra ensuite.
+- **Tests réels** : d'abord avec un numéro de test, dans un groupe de test séparé, avec un second testeur pour les réponses (les messages envoyés depuis le numéro du bot sont vus comme venant du bot). Le numéro dédié de l'asso vient ensuite.
 - **Décisions écartées** (18/11/2026) :
   - Apps Script + fournisseur hébergé payant (v2) → remplacé par le VPS (gratuit, temps réel, prêt pour la phase 2).
   - Apps Script + WAHA sur le VPS → il aurait fallu exposer WAHA sur Internet et gérer la réception des messages entre Google et le VPS ; plus simple de tout mettre sur le VPS.
@@ -59,13 +59,13 @@ L'accueil des nouveaux bénévoles : message automatique, transcription et résu
 | Besoin | Choix | Pourquoi |
 |---|---|---|
 | Langage | **TypeScript** (mode `strict`) sur **Node.js 24** | Typage = moins de bugs, lisible ; Node 24 = version LTS |
-| Serveur HTTP (réception des webhooks WAHA) | **Express** | Le plus connu et documenté : facile à reprendre pour un junior |
+| Serveur HTTP (réception des webhooks WAHA) | **Express** | Le plus connu et documenté : facile à reprendre pour un autre développeur |
 | Google Sheets | **@googleapis/sheets** (bibliothèque officielle, API Sheets seule : 0,8 Mo au lieu de 246 Mo pour `googleapis`) + compte de service | Officielle, maintenue par Google |
 | Tests | **Vitest** | Gère TypeScript sans configuration, horloge simulée intégrée |
 | Lancement | **Docker Compose** : 2 conteneurs, `waha` et `bot` | Une commande pour tout démarrer, redémarrage automatique |
 | CI | **GitHub Actions** : `npm run verifier` (types + tests) à chaque push | Déjà en place |
 
-Dépendances : le moins possible. Toute nouvelle dépendance doit être justifiée et validée par Rayane.
+Dépendances : le moins possible. Toute nouvelle dépendance doit être justifiée (besoin réel, maintenance, taille) et validée par les mainteneurs.
 
 ### 3.2 Vue d'ensemble
 
@@ -262,7 +262,7 @@ Une réponse « NON » (ou « je peux plus ») reçue en privé après la public
 
 Le référent vérifie **Présents** et **Absents**. Pour corriger quelqu'un, il change le Statut dans **Inscriptions** (liste déroulante), et les vues se mettent à jour seules.
 
-> **Point ouvert** : si on veut qu'il édite directement dans Présents/Absents, il faudrait répercuter dans Inscriptions. Propose-moi l'option la plus simple avant de coder.
+> **Point ouvert** : si on veut qu'il édite directement dans Présents/Absents, il faudrait répercuter dans Inscriptions. Choisir l'option la plus simple avant de coder.
 
 > **Cohérence après modification d'une action** (date, heure, lieu changés dans Actions) : le bot recopie les nouvelles valeurs dans les inscriptions de cette action, sans envoyer de message (§4.8).
 
@@ -333,13 +333,13 @@ Côté développeurs (terminal du VPS) :
 |---|---|---|---|
 | 1 | `migration-vps-typescript` | 1, 2 | ✅ fusionné (PR #1) |
 | 2 | `donnees-sheet` | 3, 4 | ✅ fusionné (PR #2) |
-| 3 | `Integration_WhatsApp` | 0, 5 — **en local** (Docker Desktop sur le PC de Rayane, son numéro perso, groupe de test) | ✅ test réel réussi le 20/11/2026 — PR à fusionner |
+| 3 | `Integration_WhatsApp` | 0, 5 — **en local** (Docker Desktop, numéro de test, groupe de test) | ✅ test réel réussi le 20/11/2026 — PR à fusionner |
 | 4 | `bloc-4-fonctionnalites` | 6 à 11 | terminé (fait avant le bloc 3 : pas encore de numéro de test) — PR à fusionner |
 | 5 | `bloc-5-mise-en-production` | 12, 13 | |
 
 Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 
-> **Décision (19/11/2026)** : tout le bloc 3 se fait d'abord **en local**, sur le PC de Rayane avec **Docker Desktop** (WAHA en conteneur, le bot lancé avec Node, webhook vers `http://host.docker.internal:3000/webhook/waha`), avec son numéro perso et un groupe de test. Le VPS Oracle n'arrive qu'au bloc 5, avec le **même** `docker-compose.yml`. Raisons : gratuit, itérations rapides, un problème à la fois (WhatsApp d'abord, serveur ensuite).
+> **Décision (19/11/2026)** : tout le bloc 3 se fait d'abord **en local**, avec **Docker Desktop** (WAHA en conteneur, le bot lancé avec Node, webhook vers `http://host.docker.internal:3000/webhook/waha`), avec un numéro de test et un groupe de test. Le VPS Oracle n'arrive qu'au bloc 5, avec le **même** `docker-compose.yml`. Raisons : gratuit, itérations rapides, un problème à la fois (WhatsApp d'abord, serveur ensuite).
 
 0. **Spike WAHA en local** (script jetable) : lancer WAHA dans Docker Desktop, scanner le QR code avec le numéro de test, puis vérifier :
    - envoi dans un groupe de test et récupération de l'ID du message ;
@@ -348,7 +348,7 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
    - format exact du JSON des webhooks (pour écrire l'adaptateur) ;
    - consommation mémoire et CPU sur la machine ARM.
 
-   Me faire un compte rendu avant de continuer.
+   Compte rendu obligatoire avant de continuer.
 
    **Compte rendu du spike (19/11/2026, WAHA 2026.10.1 CORE, moteur GOWS, Docker Desktop)** :
    - ✅ **Citations** : une réponse citée arrive avec `payload.replyTo.id` = ID **court** du message cité (ex. `AC43B61D…`). WAHA a aussi un ID **long** (`true_<chat>_<IDcourt>_<expéditeur>`) : l'adaptateur doit toujours manipuler l'ID court (`payload._data.Info.ID`).
@@ -379,7 +379,11 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
    - 10b, décisions : commande décochée + « en cours… » AVANT exécution (jamais relancée en boucle) ; case lue « TRUE » ou « VRAI » (langue du Sheet), décochée en vidant la cellule ; pause = plus d'envoi automatique (commandes manuelles et réception des réponses continuent) ; tableau de bord « État du bot » en 1er onglet, alerte WhatsApp seulement au changement d'état (contrat `Alertes` + `combinerAlertes` prêt pour l'e-mail) ; « Dernier passage » écrit à chaque tick (détecte un bot/VPS arrêté).
    - 10a, décisions : NON en privé d'un Confirmé après la liste (action pas encore passée) → Désisté + accusé + message au référent (avertissement Journal si pas de `NUMERO_REFERENT`) ; OUI après la liste → rien (le référent gère) ; récap = demain → J+7, sans les actions annulées, « N confirmés » / « N inscrits » / « pas encore annoncée » ; semaine vide → pas de message ; anti-doublon du récap via l'état local `data/etat.json` (créé dès 10a, écriture atomique). Décision (19/11/2026) : l'alerte « WhatsApp déconnecté » est d'abord **visible dans le Sheet** (bandeau rouge bien en vue, avec l'heure de la déconnexion, + Journal) ; un envoi d'e-mail au référent pourra être ajouté plus tard si besoin (WhatsApp étant justement indisponible, on ne peut pas prévenir par WhatsApp).
 11. **Test de bout en bout** : une semaine complète simulée avec les faux (`npm test`). Fait dans `tests/semaine.test.ts` : une quinzaine réelle (tick toutes les 15 min pendant 12 jours), 5 bénévoles, 2 actions, changements d'avis, inscription tardive, désistement tardif ; vérifie chaque message envoyé dans l'ordre exact. Vérifié qu'il attrape un bug d'annonce en double (164 messages au lieu de 6).
-12. **Déploiement** : `Dockerfile`, `docker-compose.yml` (WAHA + bot, volumes, redémarrage automatique), installation sur le VPS Oracle, sauvegarde de la session WAHA ; test réel dans un groupe WhatsApp de test avec le numéro dédié.
+12. **Déploiement** : `Dockerfile`, `docker-compose.yml` (WAHA + bot, volumes, redémarrage automatique), installation sur le VPS Oracle, sauvegarde de la session WAHA ; test réel dans un groupe WhatsApp de test avec le numéro dédié. En trois commits :
+   - **12a — le bot dans Docker** (testé en local) : `Dockerfile` (node:24-slim, `npm ci --omit=dev`, utilisateur `node`, sans .env ni secrets dans l'image), `.dockerignore`, service `bot` dans `docker-compose.yml` (réseau interne : bot → `http://waha:3000`, WAHA → `http://bot:3000/webhook/waha` ; aucun port du bot ouvert ; clé Google montée en lecture seule ; état dans le volume Docker `donnees-bot` ; `init: true` ; healthcheck sur `/sante` ; logs limités à 3 × 10 Mo). **Les images WAHA ne sont pas multi-architecture** : `WAHA_IMAGE` = `devlikeapro/waha:gows-2026.10.1` (PC) ou `gows-arm-2026.10.1` (Oracle ARM), version fixée, jamais `latest`. Swagger protégé par le mot de passe du tableau de bord. Mode développement (`npm start` + WAHA seul) décrit dans `.env.example`.
+   - **12b — VPS Oracle** : guide pas à pas et déploiement.
+   - **12c — exploitation** : sauvegarde de la session WhatsApp, mise à jour du bot.
+   - README (architecture + utilisation) refait à l'étape 13, une fois les commandes de production définitives.
 13. **Documentation** : README pour l'asso (utilisation au quotidien par le référent) + guide d'exploitation pour les mainteneurs (mise à jour, rescanner le QR code, sauvegardes, que faire si WhatsApp casse).
 
 ### À faire avant la mise en production (décidé le 20/11/2026)
@@ -423,7 +427,7 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 
 ### Améliorations prévues (après la mise en service)
 
-14. **Alerte par e-mail au référent** (demandé le 19/11/2026 ; Rayane fournira l'adresse plus tard) : quand WhatsApp est déconnecté ou qu'une erreur grave se répète, envoyer un e-mail en plus de l'alerte dans le Sheet.
+14. **Alerte par e-mail au référent** (demandé le 19/11/2026 ; adresse du référent à fournir) : quand WhatsApp est déconnecté ou qu'une erreur grave se répète, envoyer un e-mail en plus de l'alerte dans le Sheet.
    - Préparé dès l'étape 10 : contrat `Alertes` (comme `Messagerie`), première implémentation « Sheet » ; l'e-mail sera une seconde implémentation branchée à côté, sans toucher au code métier.
    - Pistes (à valider le moment venu, nouvelle dépendance à justifier) : SMTP Gmail d'un compte de l'asso avec un « mot de passe d'application » (validation en 2 étapes obligatoire) + bibliothèque `nodemailer` ; ou un service d'envoi gratuit (ex. Brevo, quelques centaines d'e-mails/jour). Le compte de service Google ne peut pas envoyer d'e-mails Gmail (sauf Google Workspace avec délégation).
    - Variables `.env` à prévoir : `ALERTE_EMAIL_DESTINATAIRE`, identifiants SMTP (secrets).

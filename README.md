@@ -1,43 +1,86 @@
 # Bot planning bénévoles (WhatsApp + Google Sheet)
 
-Automatise le planning des bénévoles d'une association : annonce des actions dans le groupe WhatsApp, inscriptions par « OUI », confirmations, liste finale des présents. Le tout piloté depuis un Google Sheet.
+Bot qui automatise le planning des bénévoles d'une association : le référent ajoute une
+action dans un Google Sheet, le bot gère tout le reste dans WhatsApp (annonce avec sondage,
+inscriptions, confirmations, liste finale, récap).
 
-> 🚧 Projet en cours de construction. Le contexte complet et les décisions sont dans [CLAUDE.md](CLAUDE.md).
+**Stack** : Node.js 24 + TypeScript · Express · [WAHA](https://waha.devlike.pro/) (API WhatsApp) ·
+API Google Sheets · Docker Compose · Vitest · GitHub Actions. Hébergement : VPS Oracle Cloud (Always Free).
 
-## Stack
+## Architecture
 
-- **Node.js 24 + TypeScript** : Node exécute les fichiers `.ts` directement, sans compilation ; `tsc` sert seulement à vérifier les types.
-- **WAHA** (API WhatsApp open source) et le bot tournent en **Docker** sur un VPS Oracle Cloud.
-- **Google Sheets** comme interface pour l'équipe (accès via l'API Google).
-- **Vitest** pour les tests, **GitHub Actions** pour la CI.
+```text
+┌──────────────── Docker Compose (VPS) ────────────────┐
+│                                                      │
+│   ┌──────────┐   webhooks (messages, votes)   ┌─────┐│
+│   │   WAHA   │ ─────────────────────────────▶ │ bot ││
+│   │(WhatsApp)│ ◀───────────────────────────── │     ││
+│   └────┬─────┘        API (envois)            └──┬──┘│
+└────────┼─────────────────────────────────────────┼───┘
+         ▼                                         ▼
+   Groupe + messages privés               Google Sheet (interface de l'équipe
+        WhatsApp                           + base de données)
+```
 
-## Démarrage (développeur)
+- Le **code métier** (`src/metier/`) ne dépend que de contrats (`src/ports/`) : WAHA, Google
+  et l'horloge sont branchés au démarrage, et remplacés par des faux dans les tests.
+- Un **tick** chaque minute lance ce qui est dû ; les messages et votes arrivent par webhook.
+- Rien n'est exposé sur Internet ; aucun message en double, même après un redémarrage.
+
+## Ce que fait le bot
+
+| Quand | Action |
+|---|---|
+| J-7, 18:00 | Annonce + sondage dans le groupe (créneaux ou « dispo / pas dispo ») |
+| À chaque vote | Inscription / retrait, demande du nom aux nouveaux bénévoles |
+| J-2, 10:00 | Demande de confirmation en privé (sondage Oui / Non) |
+| J-1, 20:00 | Liste finale des confirmés dans le groupe, confirmation en privé |
+| Après la liste | Désistement → le référent est prévenu |
+| Vendredi, 20:30 | Récap de la semaine |
+
+Heures, textes et libellés réglables dans l'onglet **Paramètres** du Sheet. L'onglet
+**Commandes** permet de tout lancer à la main (annoncer, confirmer, publier, pause…).
+
+## Installation
+
+Prérequis : Docker, Node.js 24, un Google Sheet + un compte de service
+([guide](docs/compte-service-google.md)), un numéro WhatsApp dédié au bot.
 
 ```bash
-npm install          # installe les dépendances
-npm test             # lance les tests
-npm run types        # vérifie les types TypeScript
-npm run verifier     # les deux (c'est ce que fait la CI)
-npm run test:surveiller  # relance les tests à chaque modification
-npm run installer-sheet  # crée / répare les onglets du Google Sheet (voir docs/compte-service-google.md)
-
-docker compose up -d     # démarre WAHA (WhatsApp) — tableau de bord : http://localhost:3001/dashboard
-npm run lister-groupes   # affiche les groupes WhatsApp et leur GROUPE_ID
-npm start                # démarre le bot
+npm install
+cp .env.example .env              # à remplir (chaque variable est expliquée)
+# clé du compte de service → secrets/compte-service.json
+npm run installer-sheet           # crée les onglets du Sheet
+docker compose up -d --build      # démarre WAHA + le bot
 ```
+
+Puis scanner le QR code sur http://localhost:3001/dashboard, récupérer l'ID du groupe
+(`lister-groupes`, ci-dessous) dans `GROUPE_ID`, et relancer `docker compose up -d`.
+Sur le VPS Oracle (ARM) : `WAHA_IMAGE=devlikeapro/waha:gows-arm-2026.10.1` dans le `.env`.
+
+## Commandes
+
+| Commande | Rôle |
+|---|---|
+| `docker compose up -d --build` | Démarrer / mettre à jour |
+| `docker compose logs -f bot` | Logs du bot |
+| `docker compose ps` | État (`bot` doit être *healthy*) |
+| `docker compose down` | Arrêter |
+| `docker compose run --rm bot npm run lister-groupes` | Groupes WhatsApp et leur ID |
+| `docker compose run --rm bot npm run installer-sheet` | Créer / réparer le Sheet |
+| `npm run verifier` | Types + tests (lancé par la CI) |
 
 ## Structure
 
 ```text
 src/
-  constantes.ts   statuts, onglets, mots-clés OUI/NON, paramètres par défaut
-  config.ts       lecture et vérification du .env
-  ports/          contrats Messagerie (WhatsApp), Tableur (Sheet), Horloge
-  sheets/         Google Sheets : schéma des onglets, connexion Google, installation
-  utils/          dates (fuseau Paris), téléphones, textes et détection OUI/NON, logger
-tests/            tests Vitest (même arborescence que src/)
-  faux/           versions de test des contrats : fausse messagerie, faux Sheet, horloge contrôlée
-scripts/          commandes pour les mainteneurs (installer-sheet…)
-docs/             guides (compte de service Google…)
-CLAUDE.md         cahier des charges et décisions du projet
+  index.ts, serveur.ts, planificateur.ts   démarrage, webhooks, tick
+  metier/      annonces, votes, confirmations, liste finale, récap, commandes…
+  ports/       contrats : Messagerie, Tableur, Horloge, Alertes
+  whatsapp/    adaptateur WAHA
+  sheets/      accès Google Sheets, un module par onglet
+  etat/, utils/
+tests/         Vitest, dont une quinzaine complète simulée (semaine.test.ts)
 ```
+
+Le détail des règles et des décisions est dans [CLAUDE.md](CLAUDE.md).
