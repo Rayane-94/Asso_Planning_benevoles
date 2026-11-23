@@ -92,3 +92,49 @@ describe('synchronisation des inscriptions', () => {
     expect(copies(env)[0]).toContain('Local');
   });
 });
+
+describe('nom corrigé dans Bénévoles → recopié dans les inscriptions (S8)', () => {
+  /** Bob et Alice sont dans Bénévoles, comme le bot les a enregistrés. */
+  async function avecBenevoles(): Promise<EnvironnementDeTest> {
+    const env = await bpAvecDeuxInscrits();
+    await ajouterLignesDeTest(env.tableur, 'Bénévoles', [
+      { Téléphone: '06 12 34 56 78', Prénom: 'Bob', Nom: 'Durand' },
+      { Téléphone: '06 11 22 33 44', Prénom: 'Alice', Nom: 'Martin' },
+    ]);
+    return env;
+  }
+  const noms = (env: EnvironnementDeTest) => env.tableur.lignes('Inscriptions').map((l) => l.Nom);
+
+  test('l\'équipe corrige « Salut » en « Bob Durand » dans Bénévoles : Inscriptions (donc Présents et la liste) suivent', async () => {
+    const env = await avecBenevoles();
+    await env.tableur.modifierLignes('Inscriptions', [{ numero: 2, valeurs: { Nom: 'Salut' } }]); // le mauvais nom d'avant
+    await env.tableur.modifierLignes('Bénévoles', [{ numero: 2, valeurs: { Prénom: 'Bobby' } }]);
+    await env.planificateur.tick();
+    expect(noms(env)).toEqual(['Durand Bobby', 'Martin Alice']);
+    expect(env.messagerie.envoyes).toEqual([]);
+    expect(logsDeNiveau(env, 'INFO')).toContain('Nom corrigé dans Bénévoles : « Durand Bobby » recopié dans 1 inscription(s)');
+  });
+
+  test('action passée : l\'historique ne bouge pas', async () => {
+    const env = await avecBenevoles();
+    env.horloge.regler('2026-11-23 10:00'); // le BP du 22/11 est passé
+    await env.tableur.modifierLignes('Bénévoles', [{ numero: 2, valeurs: { Prénom: 'Bobby' } }]);
+    await env.planificateur.tick();
+    expect(noms(env)[0]).toBe('Durand Bob');
+  });
+
+  test('bénévole sans prénom ni nom dans Bénévoles : le nom de l\'inscription est gardé', async () => {
+    const env = await bpAvecDeuxInscrits();
+    await ajouterLignesDeTest(env.tableur, 'Bénévoles', [{ Téléphone: '06 12 34 56 78', 'Nom WhatsApp': 'Bob 🌸' }]);
+    await env.planificateur.tick();
+    expect(noms(env)[0]).toBe('Durand Bob');
+  });
+
+  test('rien à corriger : aucune écriture', async () => {
+    const env = await avecBenevoles();
+    const donnees = { parametres: (await lireParametres(env.tableur)).parametres, actions: (await lireActions(env.tableur)).actions };
+    env.tableur.appels.ecritures = 0;
+    expect(await synchroniserInscriptions(env.ctx, donnees)).toBe(0);
+    expect(env.tableur.appels.ecritures).toBe(0);
+  });
+});
