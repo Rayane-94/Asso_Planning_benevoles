@@ -63,13 +63,15 @@ export async function lireBenevoles(tableur: Tableur): Promise<LectureBenevoles>
 /** Ajoute un nouveau bénévole (le téléphone est écrit au format lisible 06 12 34 56 78). */
 export async function ajouterBenevole(
   tableur: Tableur,
-  nouveau: { telephone: string; nomWhatsApp: string },
+  nouveau: { telephone: string; nomWhatsApp: string; nomDejaDemande?: boolean },
   maintenant: Date,
 ): Promise<void> {
   await tableur.ajouterLignes(ONGLETS.BENEVOLES, [{
     [B.TELEPHONE]: formaterTelephone(nouveau.telephone),
     [B.NOM_WHATSAPP]: nouveau.nomWhatsApp,
     [B.INSCRIT_LE]: horodatage(maintenant),
+    // Nom déjà demandé (ex. demandé en privé avant de connaître le numéro) : ne pas redemander
+    ...(nouveau.nomDejaDemande ? { [B.NOM_DEMANDE_LE]: horodatage(maintenant) } : {}),
   }]);
 }
 

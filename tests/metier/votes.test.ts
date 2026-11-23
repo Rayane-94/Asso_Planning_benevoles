@@ -3,6 +3,7 @@
  * le bot annonce le BP du samedi 28/11 (texte + sondage) ; les bénévoles votent.
  */
 import { describe, expect, test } from 'vitest';
+import { recevoirMessage } from '../../src/metier/reception.ts';
 import { recevoirVote } from '../../src/metier/votes.ts';
 import { ajouterAction, contexteDeTest, logsDeNiveau, type EnvironnementDeTest } from '../faux/contexteDeTest.ts';
 import { ajouterLignesDeTest } from '../faux/sheetDeTest.ts';
@@ -171,11 +172,13 @@ describe('votes ignorés', () => {
     expect(inscriptions(env)).toEqual([]);
   });
 
-  test('numéro masqué par WhatsApp : rien d\'inscrit, avertissement pour l\'équipe', async () => {
+  test('numéro masqué et inconnu de l\'annuaire, et message privé impossible : avertissement pour l\'équipe', async () => {
     const env = await apresAnnonce();
-    await vote(env, ['dispo !!'], null, 'Bob');
+    const unVote = env.messagerie.vote({ de: null, nom: 'Bob', sondage: env.sondage, choix: ['dispo !!'], lid: 'lid-bob' });
+    env.messagerie.faireEchouerEnvoisVers('lid-bob');
+    await recevoirVote(env.ctx, unVote);
     expect(inscriptions(env)).toEqual([]);
-    expect(logsDeNiveau(env, 'AVERTISSEMENT')[0]).toContain('Bob a voté pour BP du samedi 28/11, mais WhatsApp masque son numéro');
+    expect(logsDeNiveau(env, 'AVERTISSEMENT')[0]).toContain('à inscrire à la main');
   });
 
   test('le même vote reçu deux fois (webhook renvoyé) : traité une seule fois', async () => {
@@ -203,5 +206,81 @@ describe('file d\'attente partagée avec le tick', () => {
     const env = await apresAnnonce();
     await Promise.all([env.planificateur.tick(), vote(env, ['dispo !!'])]);
     expect(inscriptions(env)).toHaveLength(1);
+  });
+});
+
+describe('numéro masqué par WhatsApp (canal d\'annonces d\'une communauté, S9)', () => {
+  const DEMANDE = 'Bienvenue ! Pour la liste des présents, peux-tu me donner ton prénom et ton nom ?';
+  /** Bob vote depuis la communauté : WhatsApp ne donne que son identifiant masqué. */
+  const voteMasque = (env: EnvironnementDeTest & { sondage: string }, choix: string[]) =>
+    recevoirVote(env.ctx, env.messagerie.vote({ de: null, nom: 'Bob', sondage: env.sondage, choix, lid: 'lid-bob' }));
+  /** Bob répond en privé : là, WhatsApp donne son vrai numéro. */
+  const reponsePrivee = (env: EnvironnementDeTest, texte: string) =>
+    recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, nom: 'Bob', texte, lid: 'lid-bob' }));
+
+  test('A — l\'annuaire du fournisseur connaît le numéro : inscription normale, comme dans un groupe classique', async () => {
+    const env = await apresAnnonce();
+    env.messagerie.annuaire.set('lid-bob', BOB);
+    await voteMasque(env, ['dispo !!']);
+    expect(env.tableur.lignes('Inscriptions')[0]).toMatchObject({ Téléphone: '06 12 34 56 78', Statut: 'Inscrit' });
+    expect(env.messagerie.envoyes).toEqual([expect.objectContaining({ destinataire: BOB, texte: DEMANDE })]);
+  });
+
+  test('B — numéro inconnu : le vote attend, et le nom est demandé en privé à l\'identifiant masqué', async () => {
+    const env = await apresAnnonce(`${CRENEAU_1}, ${CRENEAU_2}`);
+    await voteMasque(env, [CRENEAU_1]);
+    expect(inscriptions(env)).toEqual([]);
+    expect(env.messagerie.envoyes).toEqual([expect.objectContaining({ destinataire: 'lid-bob', texte: DEMANDE })]);
+    expect(logsDeNiveau(env, 'INFO').some((l) => l.includes('nom demandé en privé, inscription dès sa réponse'))).toBe(true);
+  });
+
+  test('B — il répond son nom en privé : fiche créée avec son vrai numéro, vote enregistré, « Merci » ; pas de 2e demande', async () => {
+    const env = await apresAnnonce(`${CRENEAU_1}, ${CRENEAU_2}`);
+    await voteMasque(env, [CRENEAU_1]);
+    env.messagerie.envoyes.length = 0;
+
+    await reponsePrivee(env, 'bob durand');
+    expect(env.tableur.lignes('Bénévoles')[0]).toMatchObject({ Téléphone: '06 12 34 56 78', Prénom: 'Bob', Nom: 'Durand' });
+    expect(inscriptions(env)).toEqual([`Durand Bob : Inscrit [${CRENEAU_1}]`]);
+    expect(env.messagerie.envoyes.map((m) => [m.destinataire, m.texte])).toEqual([[BOB, "Merci Bob, c'est noté !"]]);
+  });
+
+  test('B — il change son vote avant de répondre : c\'est le DERNIER vote qui compte, une seule demande de nom', async () => {
+    const env = await apresAnnonce(`${CRENEAU_1}, ${CRENEAU_2}`);
+    await voteMasque(env, [CRENEAU_1]);
+    env.horloge.avancer({ secondes: 5 });
+    await voteMasque(env, [CRENEAU_1, CRENEAU_2]);
+    expect(env.messagerie.envoyes).toHaveLength(1);
+
+    await reponsePrivee(env, 'Bob Durand');
+    expect(inscriptions(env)).toEqual([`Durand Bob : Inscrit [${CRENEAU_1}, ${CRENEAU_2}]`]);
+  });
+
+  test('B — il vote « pas dispo » avant de répondre : rien n\'est créé dans Inscriptions', async () => {
+    const env = await apresAnnonce();
+    await voteMasque(env, ['dispo !!']);
+    env.horloge.avancer({ secondes: 5 });
+    await voteMasque(env, ['pas dispo :/']);
+    await reponsePrivee(env, 'Bob Durand');
+    expect(inscriptions(env)).toEqual([]);
+  });
+
+  test('B — sa réponse n\'est pas un nom : il est quand même inscrit (numéro connu), et le bot dit qu\'il est un robot', async () => {
+    const env = await apresAnnonce();
+    await voteMasque(env, ['dispo !!']);
+    env.messagerie.envoyes.length = 0;
+    await reponsePrivee(env, "c'est à quelle heure ?");
+    expect(inscriptions(env)).toEqual(['Bob : Inscrit']); // le nom WhatsApp en attendant
+    expect(env.messagerie.dernierEnvoi().texte).toContain('Je suis un robot');
+  });
+
+  test('B — les confirmations sont déjà parties quand il répond : sa demande de confirmation part tout de suite', async () => {
+    const env = await apresAnnonce();
+    await voteMasque(env, ['dispo !!']);
+    await env.tableur.modifierLignes('Actions', [{ numero: 2, valeurs: { Statut: 'Confirmations envoyées' } }]);
+    env.messagerie.envoyes.length = 0;
+    await reponsePrivee(env, 'Bob Durand');
+    expect(env.messagerie.sondages().map((m) => m.destinataire)).toEqual([BOB]); // le sondage Oui / Non
+    expect(inscriptions(env)).toEqual(['Durand Bob : En attente']);
   });
 });
