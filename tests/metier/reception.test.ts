@@ -8,6 +8,7 @@ import { recevoirMessage } from '../../src/metier/reception.ts';
 import { recevoirVote } from '../../src/metier/votes.ts';
 import { GROUPE_TEST } from '../faux/fausseMessagerie.ts';
 import { ajouterAction, contexteDeTest, logsDeNiveau, type EnvironnementDeTest } from '../faux/contexteDeTest.ts';
+import { changerParametre } from '../faux/sheetDeTest.ts';
 
 const BOB = '33612345678';
 const ALICE = '33611223344';
@@ -57,12 +58,49 @@ describe('réponse en privé à la demande de nom', () => {
     expect(env.messagerie.envoyes).toEqual([expect.objectContaining({ destinataire: BOB, texte: "Merci Bob, c'est noté !" })]);
   });
 
-  test("un message qui n'est pas un nom : rien n'est enregistré, info pour l'équipe", async () => {
+  test("une question au lieu du nom : rien n'est enregistré, le bot dit qu'il est un robot et donne le contact du référent", async () => {
     const env = await bobAttendSonNom();
+    await changerParametre(env.tableur, 'NUMERO_REFERENT', '06 99 99 99 99');
     await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: "c'est à quelle heure samedi ?" }));
+
     expect(env.tableur.lignes('Bénévoles')[0]).toMatchObject({ Prénom: '', Nom: '' });
-    expect(env.messagerie.envoyes).toEqual([]);
+    expect(env.messagerie.envoyes.map((m) => [m.destinataire, m.texte])).toEqual([[BOB,
+      "Je suis un robot 🤖 : je ne peux pas répondre aux questions, et je n'ai pas compris ta réponse.\n" +
+      'Pour la liste des présents, écris juste ton prénom et ton nom (par exemple : Marie Dupont).\n' +
+      'Pour une question, contacte le référent au 06 99 99 99 99.',
+    ]]);
     expect(logsDeNiveau(env, 'INFO').some((l) => l.includes('non compris comme un nom'))).toBe(true);
+  });
+
+  test('« Salut » n\'est pas pris pour un prénom ; puis le vrai nom est bien enregistré', async () => {
+    const env = await bobAttendSonNom();
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'Salut' }));
+    expect(env.tableur.lignes('Bénévoles')[0]).toMatchObject({ Prénom: '', Nom: '' });
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'bob durand' }));
+    expect(env.tableur.lignes('Bénévoles')[0]).toMatchObject({ Prénom: 'Bob', Nom: 'Durand' });
+    expect(env.messagerie.envoyes.map((m) => m.texte.split(' ')[0] + ' ' + m.texte.split(' ')[1])).toEqual(['Je suis', 'Merci Bob,']);
+  });
+
+  test('sans NUMERO_REFERENT : « contacte un responsable de l\'association »', async () => {
+    const env = await bobAttendSonNom();
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: '😂😂' }));
+    expect(env.messagerie.dernierEnvoi().texte).toContain("Pour une question, contacte un responsable de l'association.");
+  });
+
+  test('le message « robot » part 2 fois maximum (jamais de ping-pong sans fin)', async () => {
+    const env = await bobAttendSonNom();
+    for (const texte of ['?', 'hein ?', 'mdr', 'allo ?']) {
+      await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte }));
+    }
+    expect(env.messagerie.envoyes).toHaveLength(2);
+  });
+
+  test('nom déjà connu : un message privé quelconque reste sans réponse (pas de message « robot »)', async () => {
+    const env = await bobAttendSonNom();
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'Bob Durand' }));
+    env.messagerie.envoyes.length = 0;
+    await recevoirMessage(env.ctx, env.messagerie.recu({ de: BOB, texte: 'Super merci beaucoup !' }));
+    expect(env.messagerie.envoyes).toEqual([]);
   });
 
   test('une fois le nom connu, les messages privés suivants ne le changent plus', async () => {

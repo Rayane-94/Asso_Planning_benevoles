@@ -7,13 +7,15 @@
  * texte du GROUPE ne concernent plus le bot et sont ignorés. Restent les messages PRIVÉS :
  *   - OUI / NON à une demande de confirmation → voir confirmations.ts ;
  *   - NON après la publication de la liste → désistement de dernière minute (desistement.ts) ;
- *   - la réponse à la demande « prénom et nom » → fiche du bénévole.
+ *   - la réponse à la demande « prénom et nom » → fiche du bénévole ; si ce n'est pas un nom
+ *     (question, « salut »…), le bot dit qu'il est un robot et redemande (2 fois maximum).
  */
 import { MESSAGES, REPONSE, STATUT_ACTION, STATUT_INSCRIPTION } from '../constantes.ts';
 import type { MessageRecu } from '../ports/messagerie.ts';
 import { lireActions } from '../sheets/actions.ts';
 import { lireBenevoles, modifierBenevole, nomPourListe, type Benevole } from '../sheets/benevoles.ts';
 import { lireInscriptions, modifierInscriptions, type Inscription } from '../sheets/inscriptions.ts';
+import { lireParametres } from '../sheets/parametres.ts';
 import { cleDate, dateLongue } from '../utils/dates.ts';
 import { formaterTelephone } from '../utils/telephones.ts';
 import { detecterReponse, lireNomComplet, remplirModele } from '../utils/textes.ts';
@@ -69,9 +71,36 @@ async function traiterMessagePrive(ctx: Contexte, message: MessageRecu): Promise
       `Message privé de ${benevole.nomWhatsApp || formaterTelephone(benevole.telephone)} non compris comme un nom : ` +
       `« ${message.texte} » (à traiter à la main si besoin)`,
     );
+    await repondreNomIncompris(ctx, benevole);
     return;
   }
   await enregistrerNom(ctx, benevole, nomComplet);
+}
+
+/** Nombre maximum de messages « je suis un robot… » par personne (jamais de ping-pong sans fin). */
+const MAX_REPONSES_NOM_INCOMPRIS = 2;
+
+/**
+ * La réponse à la demande de nom n'est pas un nom (question, « salut », emoji…) : le bot
+ * explique qu'il est un robot, redemande le nom, et donne le contact du référent pour les
+ * vraies questions. Le numéro du référent n'apparaît QUE dans ce message (décidé le 23/11/2026),
+ * pour qu'il ne soit pas sollicité pour rien.
+ */
+async function repondreNomIncompris(ctx: Contexte, benevole: Benevole): Promise<void> {
+  const cle = `nom-incompris:${benevole.telephone}`;
+  const dejaEnvoyes = Number(ctx.etat.lire(cle) ?? 0);
+  if (dejaEnvoyes >= MAX_REPONSES_NOM_INCOMPRIS) return; // déjà expliqué 2 fois : l'équipe corrigera à la main
+
+  const { parametres } = await lireParametres(ctx.tableur);
+  const contact = parametres.numeroReferent
+    ? `le référent au ${formaterTelephone(parametres.numeroReferent)}`
+    : "un responsable de l'association";
+  try {
+    await ctx.messagerie.envoyerTexte(benevole.telephone, remplirModele(MESSAGES.NOM_INCOMPRIS, { contact }));
+    ctx.etat.ecrire(cle, String(dejaEnvoyes + 1));
+  } catch (erreur) {
+    ctx.logger.avertissement(`Message « nom incompris » non envoyé à ${formaterTelephone(benevole.telephone)} : ${String(erreur)}`);
+  }
 }
 
 /**

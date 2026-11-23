@@ -1,7 +1,7 @@
 /**
  * utils/textes.ts — Modèles de messages et détection des réponses OUI / NON.
  */
-import { EMOJIS_REPONSE, EXPRESSIONS_REPONSE, REPONSE, type Reponse } from '../constantes.ts';
+import { EMOJIS_REPONSE, EXPRESSIONS_REPONSE, MOTS_PAS_UN_NOM, REPONSE, type Reponse } from '../constantes.ts';
 
 /** Valeurs à injecter dans un modèle ({prenom}, {date}…). */
 export type ValeursModele = Record<string, string | number | null | undefined>;
@@ -74,6 +74,9 @@ export function lireNomComplet(texte: string): { prenom: string; nom: string } |
   if (!/^\p{L}[\p{L}'’ \-]*$/u.test(propre)) return null;
   const mots = propre.split(' ');
   if (mots.length > 4) return null; // plus proche d'une phrase que d'un nom
+  // « Salut », « merci », « je sais pas »… : des lettres, mais pas un nom
+  const motsInterdits: readonly string[] = MOTS_PAS_UN_NOM;
+  if (mots.some((mot) => motsInterdits.includes(normaliserPourDetection(mot)))) return null;
   const [prenom, ...reste] = mots.map(majusculeInitiale);
   return { prenom, nom: reste.join(' ') };
 }
