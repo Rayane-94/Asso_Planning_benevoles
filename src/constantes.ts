@@ -70,6 +70,15 @@ export const MESSAGES = {
   DEMANDE_NOM: 'Bienvenue ! Pour la liste des présents, peux-tu me donner ton prénom et ton nom ?',
   /** {prenom} est remplacé par le prénom reçu. */
   MERCI_NOM: "Merci {prenom}, c'est noté !",
+  /**
+   * Réponse à la demande de nom qui n'est pas un nom (question, « salut », emoji…).
+   * Envoyée 2 fois maximum par personne ; {contact} = le référent (NUMERO_REFERENT) ou,
+   * s'il n'est pas renseigné, « un responsable de l'association ».
+   */
+  NOM_INCOMPRIS:
+    "Je suis un robot 🤖 : je ne peux pas répondre aux questions, et je n'ai pas compris ta réponse.\n" +
+    'Pour la liste des présents, écris juste ton prénom et ton nom (par exemple : Marie Dupont).\n' +
+    'Pour une question, contacte {contact}.',
   /** Après un OUI / NON en privé à une demande de confirmation. */
   ACCUSE_RECEPTION: "C'est noté, merci !",
   /** La personne a répondu OUI / NON par écrit, mais a plusieurs demandes en attente. */
@@ -119,6 +128,18 @@ export const EXPRESSIONS_REPONSE = {
     'partant', 'partante', 'je serai la', 'avec plaisir', 'carrement', 'bien sur',
   ],
 } as const;
+
+/**
+ * Mots qui ne font jamais partie d'un prénom ou d'un nom : une réponse qui en contient un
+ * (« Salut », « merci », « je sais pas »…) n'est pas prise pour un nom.
+ * Comparés au texte normalisé (minuscules, sans accents).
+ */
+export const MOTS_PAS_UN_NOM = [
+  'bonjour', 'bonsoir', 'salut', 'slt', 'coucou', 'cc', 'hello', 'hey', 'yo', 'wesh', 'bjr',
+  'merci', 'mrc', 'stp', 'svp', 'mdr', 'ptdr', 'lol', 'ok', 'oui', 'non', 'test',
+  'je', 'tu', 'sais', 'pas', 'quoi', 'pourquoi', 'comment', 'quand', 'qui', 'ca', 'va', 'cv',
+  'moi', 'toi', 'nom', 'prenom', 'appelle',
+] as const;
 
 /** Emojis reconnus comme réponse (recherchés dans le texte brut). */
 export const EMOJIS_REPONSE = {

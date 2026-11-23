@@ -23,6 +23,14 @@ describe('lireNomComplet : la réponse à « ton prénom et ton nom ? »', () =>
     'je ne sais pas trop quoi te répondre là',
     'bob@mail.com',
     '👍',
+    // des lettres, mais pas un nom (S7, après la démo du 23/11)
+    'Salut',
+    'merci',
+    'je sais pas',
+    'Bonjour Marie',
+    'mdr',
+    'Coucou ça va',
+    "Je m'appelle Marie",
   ])('« %s » → pas un nom (null)', (texte) => {
     expect(lireNomComplet(texte)).toBeNull();
   });

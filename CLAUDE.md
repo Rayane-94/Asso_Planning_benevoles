@@ -424,6 +424,9 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
       - Le **OUI / NON écrit reste accepté** en secours. Si le texte part mais pas le sondage : « En attente » avec l'ID du texte (avertissement), la personne répond par écrit.
       - L'ancien `TEXTE_CONFIRMATION` (« Réponds OUI ou NON ») est remplacé à l'installation s'il n'a pas été personnalisé.
       - ⚠️ Sondages en **conversation privée jamais testés en réel** (seulement dans un groupe) → à vérifier au prochain test.
+  - **Démo à l'équipe (23/11/2026)** : réussie. Retours → S7.
+    - **S7 fait — demande de nom plus robuste** : un nouveau bénévole = numéro absent de Bénévoles (la question n'est posée qu'une fois, « Nom demandé le »). Une réponse qui n'est pas un nom (question, emoji, chiffres, plus de 4 mots, ou un mot de `MOTS_PAS_UN_NOM` : « salut », « merci », « je sais pas »…) n'est pas enregistrée ; le bot répond `MESSAGES.NOM_INCOMPRIS` (« Je suis un robot 🤖… écris juste ton prénom et ton nom… pour une question, contacte le référent au … »), **2 fois maximum** par personne (clé `nom-incompris:<tél>` de l'état local). Le numéro du référent (`NUMERO_REFERENT`) n'apparaît QUE dans ce message, pour qu'il ne soit pas sollicité pour rien ; sans numéro → « un responsable de l'association ». Nom déjà connu → les messages privés quelconques restent sans réponse.
+    - **S8 fait — les noms se corrigent dans Bénévoles** : à chaque tick (même en pause, sans aucun message), `synchronisation.ts` recopie le nom de Bénévoles (`nomPourListe`) dans les inscriptions **d'aujourd'hui et à venir** (l'historique ne bouge pas), seulement si le bénévole a un prénom ou un nom. Une correction faite directement dans Inscriptions est donc remplacée par celle de Bénévoles. Une seule écriture pour tous les changements (actions + noms).
 
 ### Améliorations prévues (après la mise en service)
 
