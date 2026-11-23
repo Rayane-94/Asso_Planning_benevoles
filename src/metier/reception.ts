@@ -22,6 +22,7 @@ import { detecterReponse, lireNomComplet, remplirModele } from '../utils/textes.
 import { traiterReponseConfirmation } from './confirmations.ts';
 import type { Contexte } from './contexte.ts';
 import { traiterDesistementTardif } from './desistement.ts';
+import { rejouerVotesEnAttente } from './votes.ts';
 
 /**
  * Traite un message reçu. Ne lève jamais d'erreur : un problème est noté dans le Journal
@@ -45,8 +46,15 @@ export async function recevoirMessage(ctx: Contexte, message: MessageRecu): Prom
   });
 }
 
-async function traiterMessagePrive(ctx: Contexte, message: MessageRecu): Promise<void> {
-  if (message.telephone === null) return;
+async function traiterMessagePrive(ctx: Contexte, recu: MessageRecu): Promise<void> {
+  // Numéro masqué : on demande à l'annuaire du fournisseur (rare en privé, mais possible)
+  const telephone = recu.telephone ?? await ctx.messagerie.retrouverTelephone(recu.idBrut);
+  if (telephone === null) return;
+  const message: MessageRecu = { ...recu, telephone };
+
+  // Une personne au numéro masqué qui avait voté : maintenant qu'on a son numéro, ses votes
+  // en attente sont enregistrés (S9). Puis son message est traité normalement (son nom…).
+  await rejouerVotesEnAttente(ctx, message.idBrut, telephone, message.nomWhatsApp);
 
   // OUI / NON : réponse à une demande de confirmation (et jamais un nom).
   const reponse = detecterReponse(message.texte);
@@ -55,13 +63,13 @@ async function traiterMessagePrive(ctx: Contexte, message: MessageRecu): Promise
     // Pas de demande ouverte : peut-être un NON après la publication de la liste (§4.6)…
     if (!traite && reponse === REPONSE.NON) traite = await traiterDesistementTardif(ctx, message);
     // … ou un NON pour annuler une inscription faite avant les confirmations.
-    if (!traite && reponse === REPONSE.NON) await retirerEnPrive(ctx, message.telephone);
+    if (!traite && reponse === REPONSE.NON) await retirerEnPrive(ctx, telephone);
     return;
   }
 
   // Sinon : peut-être la réponse à la demande de nom ?
   const { parTelephone } = await lireBenevoles(ctx.tableur);
-  const benevole = parTelephone.get(message.telephone);
+  const benevole = parTelephone.get(telephone);
   const attenduUnNom = benevole && benevole.nomDemandeLe !== '' && benevole.prenom === '' && benevole.nom === '';
   if (!benevole || !attenduUnNom) return; // message privé qui ne concerne pas le bot
 

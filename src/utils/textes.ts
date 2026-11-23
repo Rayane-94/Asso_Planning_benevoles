@@ -64,7 +64,7 @@ export function detecterReponse(texte: string | null | undefined): Reponse | nul
  *
  *   'bob durand'          → { prenom: 'Bob', nom: 'Durand' }
  *   'Jean-Pierre De La Tour' → { prenom: 'Jean-Pierre', nom: 'De La Tour' }
- *   'Alice'               → { prenom: 'Alice', nom: '' }
+ *   'Alice'               → null (le nom de famille manque)
  *   "c'est à quelle heure ?" → null
  */
 export function lireNomComplet(texte: string): { prenom: string; nom: string } | null {
@@ -73,7 +73,12 @@ export function lireNomComplet(texte: string): { prenom: string; nom: string } |
   // Uniquement des lettres (avec accents), espaces, tirets et apostrophes (' ou ’, celle des iPhone)
   if (!/^\p{L}[\p{L}'’ \-]*$/u.test(propre)) return null;
   const mots = propre.split(' ');
+  // Prénom ET nom obligatoires (test réel du 23/11/2026 : « tcdjib » seul était accepté)
+  if (mots.length < 2) return null;
   if (mots.length > 4) return null; // plus proche d'une phrase que d'un nom
+  // Chaque mot de 3 lettres ou plus doit contenir une voyelle : écarte « jjj », « xkcd »…
+  // (les mots courts sont acceptés : « Ng » est un vrai nom de famille)
+  if (!mots.every((mot) => mot.length <= 2 || /[aeiouyàâäéèêëîïôöùûüÿæœ]/i.test(mot))) return null;
   // « Salut », « merci », « je sais pas »… : des lettres, mais pas un nom
   const motsInterdits: readonly string[] = MOTS_PAS_UN_NOM;
   if (mots.some((mot) => motsInterdits.includes(normaliserPourDetection(mot)))) return null;

@@ -14,7 +14,8 @@
 export interface Messagerie {
   /**
    * Envoie un texte.
-   * @param destinataire numéro E.164 sans « + », ou ID de groupe
+   * @param destinataire numéro E.164 sans « + », ID de groupe, ou identifiant brut
+   *        (idBrut) d'une personne dont on ne connaît pas encore le numéro
    * @param options.citeId pour répondre en citant un message
    * @return l'ID du message envoyé (sert à reconnaître les réponses qui le citent)
    * @throws si l'envoi échoue (numéro invalide, WhatsApp déconnecté…)
@@ -35,6 +36,15 @@ export interface Messagerie {
 
   /** La session WhatsApp est-elle connectée ? (ne lève pas d'erreur : renvoie ok: false) */
   verifierConnexion(): Promise<EtatConnexion>;
+
+  /**
+   * Retrouve le vrai numéro derrière un identifiant masqué (le « LID » que WhatsApp donne
+   * à la place du numéro, par exemple dans le canal d'annonces d'une communauté).
+   * @param idBrut l'identifiant reçu (MessageRecu.idBrut, VoteRecu.idBrut)
+   * @return le numéro E.164 sans « + », ou null si le fournisseur ne le connaît pas
+   *         (ne lève pas d'erreur)
+   */
+  retrouverTelephone(idBrut: string): Promise<string | null>;
 }
 
 export interface Groupe {

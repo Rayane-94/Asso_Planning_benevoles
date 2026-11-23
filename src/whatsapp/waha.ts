@@ -95,6 +95,24 @@ export class MessagerieWaha implements Messagerie {
   }
 
   /** Appelle l'API de WAHA ; lève une erreur claire si WAHA est injoignable ou répond une erreur. */
+  /**
+   * WAHA tient un annuaire « LID → numéro », appris au fil des échanges (contacts, groupes
+   * classiques, conversations privées). Route : GET /api/{session}/lids/{lid} → { lid, pn }.
+   */
+  async retrouverTelephone(idBrut: string): Promise<string | null> {
+    const direct = telephoneDepuisIdentifiant(idBrut);
+    if (direct !== null) return direct; // ce n'était pas un identifiant masqué
+    if (!idBrut.endsWith('@lid')) return null;
+    try {
+      const reponse = await this.appeler<{ pn?: string }>(
+        'GET', `/api/${encodeURIComponent(this.config.session)}/lids/${encodeURIComponent(idBrut)}`,
+      );
+      return telephoneDepuisIdentifiant(reponse.pn);
+    } catch {
+      return null; // inconnu de WAHA (ou WAHA indisponible) : le métier gère le cas « numéro masqué »
+    }
+  }
+
   private async appeler<T>(methode: 'GET' | 'POST', chemin: string, corps?: unknown): Promise<T> {
     let reponse: Response;
     try {

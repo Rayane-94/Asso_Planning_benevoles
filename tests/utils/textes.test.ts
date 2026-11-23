@@ -7,11 +7,11 @@ describe('lireNomComplet : la réponse à « ton prénom et ton nom ? »', () =>
     ['bob durand', 'Bob', 'Durand'],
     ['BOB DURAND', 'Bob', 'Durand'],
     ['  Alice   Martin ', 'Alice', 'Martin'],
-    ['Alice', 'Alice', ''],
     ['jean-pierre de la tour', 'Jean-Pierre', 'De La Tour'],
     ['Awa N’Diaye', 'Awa', 'N’Diaye'], // apostrophe typographique (iPhone)
     ['Ronan McDonald', 'Ronan', 'McDonald'], // casse mixte gardée telle quelle
     ['Élodie Bérénice', 'Élodie', 'Bérénice'],
+    ['linda ng', 'Linda', 'Ng'], // nom court sans voyelle : accepté
   ])('« %s » → prénom « %s », nom « %s »', (texte, prenom, nom) => {
     expect(lireNomComplet(texte)).toEqual({ prenom, nom });
   });
@@ -31,6 +31,10 @@ describe('lireNomComplet : la réponse à « ton prénom et ton nom ? »', () =>
     'mdr',
     'Coucou ça va',
     "Je m'appelle Marie",
+    // prénom ET nom obligatoires ; chaque mot avec une voyelle (test réel du 23/11)
+    'tcdjib',
+    'Alice',
+    'xkcd dvd',
   ])('« %s » → pas un nom (null)', (texte) => {
     expect(lireNomComplet(texte)).toBeNull();
   });

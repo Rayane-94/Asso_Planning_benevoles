@@ -43,6 +43,8 @@ export interface DescriptionMessageRecu {
   nom?: string;
   /** Pour simuler un doublon : réutiliser l'ID d'un message déjà reçu. */
   id?: string;
+  /** Identifiant masqué (LID) de l'expéditeur, ex. 'lid-bob' (sinon : le numéro). */
+  lid?: string;
 }
 
 /** Ce qu'il faut pour fabriquer un vote. */
@@ -56,6 +58,8 @@ export interface DescriptionVote {
   nom?: string;
   groupe?: string;
   id?: string;
+  /** Identifiant masqué (LID) de la personne, ex. 'lid-bob'. */
+  lid?: string;
 }
 
 export class FausseMessagerie implements Messagerie {
@@ -106,11 +110,18 @@ export class FausseMessagerie implements Messagerie {
       : { ok: false, numero: null, detail: 'Session déconnectée (simulation de test)' };
   }
 
+  /** Annuaire « identifiant masqué → numéro » (comme celui de WAHA), rempli par le test. */
+  readonly annuaire = new Map<string, string>();
+
+  async retrouverTelephone(idBrut: string): Promise<string | null> {
+    return this.annuaire.get(idBrut) ?? null;
+  }
+
   // ----- Commandes pour les tests -----
 
   /** Fabrique un message reçu par le bot (à passer ensuite au code qui traite les messages). */
-  recu({ de, texte, groupe, cite, nom = '', id }: DescriptionMessageRecu): MessageRecu {
-    const idBrut = de ?? `lid-${++this.compteur}`;
+  recu({ de, texte, groupe, cite, nom = '', id, lid }: DescriptionMessageRecu): MessageRecu {
+    const idBrut = lid ?? de ?? `lid-${++this.compteur}`;
     return {
       id: id ?? `recu-${++this.compteur}`,
       discussionId: groupe ?? idBrut,
@@ -128,8 +139,8 @@ export class FausseMessagerie implements Messagerie {
    * Fabrique un vote dans un sondage (à passer ensuite à recevoirVote).
    * `choix` = TOUS les choix cochés après ce vote (comme WhatsApp) ; [] = vote retiré.
    */
-  vote({ de, sondage, choix, nom = '', groupe = GROUPE_TEST, id }: DescriptionVote): VoteRecu {
-    const idBrut = de ?? `lid-${++this.compteur}`;
+  vote({ de, sondage, choix, nom = '', groupe = GROUPE_TEST, id, lid }: DescriptionVote): VoteRecu {
+    const idBrut = lid ?? de ?? `lid-${++this.compteur}`;
     return {
       id: id ?? `vote-${++this.compteur}`,
       sondageId: sondage,

@@ -166,6 +166,25 @@ describe('MessagerieWaha (avec un faux WAHA)', () => {
     }]);
   });
 
+  test('retrouverTelephone : demande l\'annuaire LID → numéro de WAHA (route /lids/{lid})', async () => {
+    const { messagerie, appels } = fauxWaha({
+      [`/api/default/lids/${encodeURIComponent(BENEVOLE.lid)}`]: { corps: { lid: BENEVOLE.lid, pn: `${BENEVOLE.numero}@c.us` } },
+    });
+    expect(await messagerie.retrouverTelephone(BENEVOLE.lid)).toBe(BENEVOLE.numero);
+    expect(appels[0]).toMatchObject({ methode: 'GET', cle: 'cle-de-test' });
+  });
+
+  test('retrouverTelephone : LID inconnu de WAHA → null (jamais d\'erreur)', async () => {
+    const { messagerie } = fauxWaha({}); // 404
+    expect(await messagerie.retrouverTelephone(BENEVOLE.lid)).toBeNull();
+  });
+
+  test('retrouverTelephone : un vrai numéro (…@c.us) est rendu tel quel, sans appeler WAHA', async () => {
+    const { messagerie, appels } = fauxWaha({});
+    expect(await messagerie.retrouverTelephone(`${BENEVOLE.numero}@c.us`)).toBe(BENEVOLE.numero);
+    expect(appels).toEqual([]);
+  });
+
   test('envoyerSondage : requête au format du spike (poll.name / options / multipleAnswers), renvoie l\'ID COURT', async () => {
     const { messagerie, appels } = fauxWaha({
       '/api/sendPoll': { status: 201, corps: { id: `true_${GROUPE}_3EB06AE4FF8398BBED51EC_33700000001@c.us` } },
