@@ -35,7 +35,7 @@ L'accueil des nouveaux bénévoles : message automatique, transcription et résu
 ## 2. Contraintes et décisions
 
 - **Hébergement : VPS Oracle Cloud « Always Free »** (machine ARM). Coût visé : 0 €.
-  - Compte passé en **« Pay As You Go »** (reste gratuit dans les limites Always Free) pour éviter qu'Oracle récupère la machine jugée inactive, avec une **alerte de budget à 1 €**.
+  - Prévu : compte en **« Pay As You Go »** (évite qu'Oracle récupère la machine jugée inactive). **Décision (27/11/2026) : le compte reste gratuit**, car le passage demandait une pré-autorisation d'environ 93 € sur la carte. En compensation, la **sentinelle** (voir §7, n° 14) prévient par e-mail si la machine s'arrête. Création de la machine ARM refusée pour l'instant (« Out of capacity » à Paris) : à réessayer jusqu'à ce que ça passe.
 - **WhatsApp via WAHA** (WhatsApp HTTP API, open source, version gratuite « Core », une seule session = un numéro), en Docker sur le même VPS. Connexion par QR code. API non officielle : risque de bannissement (voir §6).
 - **Google Sheets comme interface** : l'équipe consulte et corrige. Exportable en `.xlsx`. Le bot y accède via l'API Google avec un **compte de service** (compte « robot » Google partagé en éditeur sur le Sheet).
 - **Changer de fournisseur WhatsApp doit rester facile** (interface `Messagerie`, voir §3.3) : si WAHA casse, on peut brancher Evolution API ou un fournisseur hébergé payant (Green-API…) sans toucher au code métier.
@@ -283,6 +283,7 @@ Colonne Valeur au format texte.
 | `HEURE_LISTE` | 20:00 (la veille) |
 | `RECAP_ACTIF` / `JOUR_RECAP` / `HEURE_RECAP` | oui / vendredi / 20:30 |
 | `NUMERO_REFERENT` | (vide) |
+| `EMAIL_ALERTE` | (vide = propriétaire du Sheet) — lu par la sentinelle, pas par le bot |
 | `TYPES_ACTIONS` | Maraude, BP, Paniers anti-gaspi, Collecte, Événement, Ménage |
 | `TEXTE_ANNONCE`, `TEXTE_CONFIRMATION`, `TEXTE_VALIDATION` | Modèles avec des variables `{type}` `{date}` `{heure}` `{lieu}` `{prenom}` `{limite}` |
 
@@ -333,9 +334,10 @@ Côté développeurs (terminal du VPS) :
 |---|---|---|---|
 | 1 | `migration-vps-typescript` | 1, 2 | ✅ fusionné (PR #1) |
 | 2 | `donnees-sheet` | 3, 4 | ✅ fusionné (PR #2) |
-| 3 | `Integration_WhatsApp` | 0, 5 — **en local** (Docker Desktop, numéro de test, groupe de test) | ✅ test réel réussi le 20/11/2026 — PR à fusionner |
-| 4 | `bloc-4-fonctionnalites` | 6 à 11 | terminé (fait avant le bloc 3 : pas encore de numéro de test) — PR à fusionner |
-| 5 | `bloc-5-mise-en-production` | 12, 13 | |
+| 3 | `Integration_WhatsApp` | 0, 5, S1 à S6 (sondages) — **en local** (Docker Desktop, numéro de test, groupe de test) | ✅ fusionné |
+| 4 | `bloc-4-fonctionnalites` | 6 à 11 | ✅ fusionné |
+| 5 | `bloc-5-mise-en-production` | 12a (Docker), README, S7 à S9 (nom robuste, noms corrigés, communauté) | ✅ fusionné (23/11/2026) |
+| 6 | `deploiement-oracle` | 12b (VPS Oracle), 12c (exploitation), 13 (documentation) | en cours |
 
 Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 
@@ -436,6 +438,7 @@ Les blocs 3 et 4 peuvent être inversés si le numéro de test n'est pas prêt.
 ### Améliorations prévues (après la mise en service)
 
 14. **Alerte par e-mail au référent** (demandé le 19/11/2026 ; adresse du référent à fournir) : quand WhatsApp est déconnecté ou qu'une erreur grave se répète, envoyer un e-mail en plus de l'alerte dans le Sheet.
+   - **Fait autrement (27/11/2026) — sentinelle** : script Apps Script collé dans le Sheet (`outils/sentinelle.gs`, guide `docs/sentinelle.md`), qui tourne chez Google toutes les 10 min, indépendamment du VPS. E-mail si « Dernier passage » a plus de 30 min de retard (bot ou VPS arrêté : seul cas que le bot ne peut pas signaler) ou si la ligne WhatsApp est 🔴 ; e-mail « réparé » au retour ; un e-mail par changement d'état seulement. Destinataires : paramètre `EMAIL_ALERTE` (vide → propriétaire du Sheet). Aucune dépendance ni secret SMTP côté bot. Raison : compte Oracle resté gratuit (sans Pay As You Go), donc risque d'arrêt de la machine jugée inactive. Le reste ci-dessous (erreur grave répétée) reste à faire si besoin.
    - Préparé dès l'étape 10 : contrat `Alertes` (comme `Messagerie`), première implémentation « Sheet » ; l'e-mail sera une seconde implémentation branchée à côté, sans toucher au code métier.
    - Pistes (à valider le moment venu, nouvelle dépendance à justifier) : SMTP Gmail d'un compte de l'asso avec un « mot de passe d'application » (validation en 2 étapes obligatoire) + bibliothèque `nodemailer` ; ou un service d'envoi gratuit (ex. Brevo, quelques centaines d'e-mails/jour). Le compte de service Google ne peut pas envoyer d'e-mails Gmail (sauf Google Workspace avec délégation).
    - Variables `.env` à prévoir : `ALERTE_EMAIL_DESTINATAIRE`, identifiants SMTP (secrets).
