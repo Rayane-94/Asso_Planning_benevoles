@@ -66,12 +66,19 @@ export class MessagerieWaha implements Messagerie {
     const reponse = await this.appeler<unknown>('GET', `/api/${encodeURIComponent(this.config.session)}/groups`);
     // Selon le moteur, WAHA renvoie une liste ou un objet { id: groupe } ; et les champs
     // s'appellent id/subject (format général) ou JID/Name (moteur GOWS).
-    const liste = Array.isArray(reponse) ? reponse : Object.values(reponse ?? {});
-    return liste.map((brut) => {
-      const groupe = brut as Record<string, unknown>;
+    const liste = (Array.isArray(reponse) ? reponse : Object.values(reponse ?? {})) as Record<string, unknown>[];
+    const nom = (groupe: Record<string, unknown>) => String(groupe.subject ?? groupe.name ?? groupe.Name ?? '');
+    const nomsParId = new Map(liste.map((groupe) => [String(groupe.id ?? groupe.JID ?? ''), nom(groupe)]));
+    return liste.map((groupe): Groupe => {
+      // Communautés (moteur GOWS, vu au test du 23/11/2026) : IsParent = la communauté elle-même ;
+      // IsDefaultSubGroup = son canal d'annonces ; LinkedParentJID = la communauté d'un sous-groupe.
+      const genre = groupe.IsParent === true ? 'communaute' : groupe.IsDefaultSubGroup === true ? 'annonces' : 'groupe';
+      const parent = typeof groupe.LinkedParentJID === 'string' ? nomsParId.get(groupe.LinkedParentJID) : undefined;
       return {
         id: String(groupe.id ?? groupe.JID ?? ''),
-        nom: String(groupe.subject ?? groupe.name ?? groupe.Name ?? ''),
+        nom: nom(groupe),
+        genre,
+        ...(parent ? { communaute: parent } : {}),
       };
     }).filter((groupe) => groupe.id !== '');
   }
