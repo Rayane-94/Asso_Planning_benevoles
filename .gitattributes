@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Scripts bash : toujours des fins de ligne Unix, sinon ils plantent sur le VPS (Linux)
+*.sh text eol=lf

@@ -171,6 +171,10 @@ free -h                      # mémoire utilisée
 Dans le Sheet, l'onglet **État du bot** doit être 🟢 et « Dernier passage » doit avancer
 chaque minute. Faire enfin un test réel : une action, « Annoncer maintenant », un vote.
 
+Puis : faire une **première sauvegarde** (voir « Sauvegarde » ci-dessous) et installer la
+**Sentinelle** dans le Sheet ([sentinelle.md](sentinelle.md)) pour être prévenu par e-mail si la
+machine s'arrête.
+
 ---
 
 ## Au quotidien
@@ -178,6 +182,40 @@ chaque minute. Faire enfin un test réel : une action, « Annoncer maintenant »
 | Je veux… | Commande (sur la machine, dans `~/Asso_Planning_benevoles`) |
 |---|---|
 | Voir les logs du bot | `docker compose logs -f bot` |
-| Mettre à jour le bot | `git pull && docker compose up -d --build` |
+| Mettre à jour le bot | `bash outils/mettre-a-jour.sh` |
+| Sauvegarder (session WhatsApp + état) | `bash outils/sauvegarder.sh` |
+| Restaurer une sauvegarde | `bash outils/restaurer.sh sauvegardes/sauvegarde-….tgz` |
 | Redémarrer | `docker compose restart` |
 | Lancer un script | `docker compose run --rm bot npm run installer-sheet` |
+
+**Mise à jour** : `mettre-a-jour.sh` fait `git pull`, reconstruit le bot, attend qu'il soit
+« healthy » puis supprime les anciennes images. Coupure de quelques secondes ; la session
+WhatsApp n'est pas touchée.
+
+---
+
+## Sauvegarde de la session WhatsApp
+
+La sauvegarde évite de rescanner le QR code si la machine est perdue ou réinstallée. Elle est
+**manuelle** : la faire après l'installation (phase 7), puis avant toute opération risquée
+(réinstallation, changement de machine) et de temps en temps (une fois par mois).
+
+1. **Sur la machine** : `bash outils/sauvegarder.sh` (WAHA et le bot sont coupés ~15 s).
+   Le fichier est créé dans `sauvegardes/` ; les 5 plus récentes sont gardées.
+2. **Rapatrier sur le PC** (PowerShell, à la racine du projet) — une sauvegarde restée sur la
+   machine ne sert à rien si la machine est perdue :
+
+   ```powershell
+   mkdir sauvegardes -Force
+   scp -i $HOME\.ssh\vps_benevoles "ubuntu@IP:~/Asso_Planning_benevoles/sauvegardes/*.tgz" sauvegardes\
+   ```
+
+⚠️ Une sauvegarde **donne accès au compte WhatsApp** du bot : ne jamais la commiter (le dossier
+`sauvegardes/` est ignoré par Git), ni l'envoyer par e-mail ou messagerie.
+
+**Restaurer** (nouvelle machine, par ex.) : installer le bot jusqu'à la phase 5 **sans** scanner
+le QR code, copier le fichier sur la machine (`scp` dans l'autre sens), puis
+`bash outils/restaurer.sh sauvegardes/sauvegarde-….tgz` (demande de taper OUI).
+- Une session ne doit tourner qu'à **un seul endroit** : arrêter l'ancienne machine d'abord.
+- Prendre la sauvegarde **la plus récente**. Si WhatsApp a déconnecté la session entre-temps,
+  le tableau de bord WAHA redemande le QR code : le rescanner (phase 6).
