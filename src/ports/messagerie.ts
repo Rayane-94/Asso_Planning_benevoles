@@ -50,6 +50,15 @@ export interface Messagerie {
 export interface Groupe {
   id: string;
   nom: string;
+  /**
+   * Facultatif (affiché par `npm run lister-groupes`) :
+   *   - 'groupe'     : groupe classique (ou sous-groupe d'une communauté) ;
+   *   - 'annonces'   : canal d'annonces d'une communauté → le GROUPE_ID à choisir pour une communauté ;
+   *   - 'communaute' : la communauté elle-même → on ne peut PAS y publier.
+   */
+  genre?: 'groupe' | 'annonces' | 'communaute';
+  /** Nom de la communauté dont ce groupe fait partie, s'il y en a une. */
+  communaute?: string;
 }
 
 export interface EtatConnexion {

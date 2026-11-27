@@ -220,12 +220,31 @@ describe('MessagerieWaha (avec un faux WAHA)', () => {
     const { messagerie } = fauxWaha({
       '/api/default/groups': { corps: [{ JID: GROUPE, Name: 'Test bot bénévoles', Participants: [] }] },
     });
-    expect(await messagerie.listerGroupes()).toEqual([{ id: GROUPE, nom: 'Test bot bénévoles' }]);
+    expect(await messagerie.listerGroupes()).toEqual([{ id: GROUPE, nom: 'Test bot bénévoles', genre: 'groupe' }]);
   });
 
   test('listerGroupes : comprend aussi le format général (objet { id: { subject } })', async () => {
     const { messagerie } = fauxWaha({ '/api/default/groups': { corps: { [GROUPE]: { id: GROUPE, subject: 'Bénévoles' } } } });
-    expect(await messagerie.listerGroupes()).toEqual([{ id: GROUPE, nom: 'Bénévoles' }]);
+    expect(await messagerie.listerGroupes()).toEqual([{ id: GROUPE, nom: 'Bénévoles', genre: 'groupe' }]);
+  });
+
+  test('listerGroupes : distingue la communauté, son canal d\'annonces et ses sous-groupes (même nom)', async () => {
+    // Structure du test réel du 23/11/2026 (IDs anonymisés) : la communauté et son canal
+    // d'annonces portent le même nom ; seul le canal d'annonces peut recevoir les annonces.
+    const { messagerie } = fauxWaha({
+      '/api/default/groups': {
+        corps: [
+          { JID: '120000000000000001@g.us', Name: 'Asso', IsParent: true },
+          { JID: '120000000000000002@g.us', Name: 'Asso', IsAnnounce: true, IsDefaultSubGroup: true, LinkedParentJID: '120000000000000001@g.us' },
+          { JID: '120000000000000003@g.us', Name: 'Discussions', LinkedParentJID: '120000000000000001@g.us' },
+        ],
+      },
+    });
+    expect(await messagerie.listerGroupes()).toEqual([
+      { id: '120000000000000001@g.us', nom: 'Asso', genre: 'communaute' },
+      { id: '120000000000000002@g.us', nom: 'Asso', genre: 'annonces', communaute: 'Asso' },
+      { id: '120000000000000003@g.us', nom: 'Discussions', genre: 'groupe', communaute: 'Asso' },
+    ]);
   });
 
   test('verifierConnexion : WORKING → connecté, avec le numéro du bot', async () => {

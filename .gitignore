@@ -11,6 +11,9 @@ secrets/
 # Données du bot sur le VPS (état local, session WhatsApp)
 data/
 
+# Sauvegardes (outils/sauvegarder.sh) : contiennent la session WhatsApp = accès au compte
+sauvegardes/
+
 # Fichiers système / éditeur
 .DS_Store
 Thumbs.db

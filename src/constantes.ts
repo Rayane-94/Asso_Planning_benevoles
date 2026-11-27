@@ -164,6 +164,11 @@ export const PARAMETRES_DEFAUT = {
   JOUR_RECAP: { valeur: 'vendredi', description: 'Jour du récap de la semaine' },
   HEURE_RECAP: { valeur: '20:30', description: 'Heure du récap de la semaine' },
   NUMERO_REFERENT: { valeur: '', description: 'Numéro du référent (prévenu des désistements tardifs)' },
+  // Lu uniquement par la sentinelle (outils/sentinelle.gs), pas par le bot.
+  EMAIL_ALERTE: {
+    valeur: '',
+    description: "E-mail(s) prévenu(s) si le bot s'arrête ou si WhatsApp est déconnecté (séparés par des virgules ; vide = propriétaire du Sheet)",
+  },
   TYPES_ACTIONS: { valeur: 'Maraude, BP, Paniers anti-gaspi, Collecte, Événement, Ménage', description: "Types d'actions proposés dans la liste déroulante" },
   OPTION_DISPO: { valeur: 'dispo !!', description: "Choix « je viens » du sondage, quand l'action n'a pas de créneaux" },
   OPTION_PAS_DISPO: { valeur: 'pas dispo :/', description: 'Choix « je ne viens pas » du sondage (toujours en dernier)' },

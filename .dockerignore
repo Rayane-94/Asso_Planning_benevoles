@@ -5,6 +5,8 @@
 .env.*
 secrets/
 data/
+sauvegardes/
+outils/
 
 # Inutile pour faire tourner le bot
 node_modules/

@@ -281,10 +281,13 @@ export class GoogleSheets implements Tableur, AdministrationTableur {
     }));
   }
 
-  /** Lance un appel à Google et traduit les erreurs courantes en messages compréhensibles. */
+  /**
+   * Lance un appel à Google (avec nouveaux essais si le quota est dépassé) et traduit les
+   * erreurs courantes en messages compréhensibles.
+   */
   private async appeler<T>(onglet: string, appel: () => Promise<T>): Promise<T> {
     try {
-      return await appel();
+      return await reessayerSiQuotaDepasse(appel);
     } catch (erreur) {
       throw new Error(expliquerErreurGoogle(erreur, onglet, this.emailCompteService), { cause: erreur });
     }
@@ -346,6 +349,40 @@ export function separateurPourLangue(langue: string): SeparateurArguments {
   }
 }
 
+/**
+ * Attentes avant chaque nouvel essai quand Google répond « quota dépassé » (≈ 60 requêtes par
+ * minute) : 15 s, puis 30 s, puis 60 s. Le quota se recharge en continu, donc ça finit par passer.
+ */
+export const ATTENTES_QUOTA_MS = [15_000, 30_000, 60_000] as const;
+
+/**
+ * Lance l'appel ; si Google répond « quota dépassé » (code 429), attend puis réessaie.
+ * Sans risque de doublon : une requête refusée pour quota n'a rien lu ni écrit.
+ * Cas typique (test du 27/11/2026) : au redémarrage, WhatsApp livre d'un coup les votes faits
+ * pendant l'arrêt ; sans nouvel essai, certains étaient refusés par Google et perdus.
+ * Pendant l'attente, les autres messages patientent dans la file du bot (rien n'est perdu).
+ */
+export async function reessayerSiQuotaDepasse<T>(
+  appel: () => Promise<T>,
+  attentes: readonly number[] = ATTENTES_QUOTA_MS,
+  attendre: (ms: number) => Promise<void> = (ms) => new Promise((fin) => setTimeout(fin, ms)),
+): Promise<T> {
+  for (const attente of attentes) {
+    try {
+      return await appel();
+    } catch (erreur) {
+      if (!estQuotaDepasse(erreur)) throw erreur;
+      await attendre(attente);
+    }
+  }
+  return appel(); // dernier essai : une erreur, cette fois, remonte
+}
+
+function estQuotaDepasse(erreur: unknown): boolean {
+  const { code, status } = (erreur ?? {}) as { code?: unknown; status?: unknown };
+  return [code, status].some((valeur) => valeur === 429 || valeur === '429');
+}
+
 /** Transforme une erreur de l'API Google en message qui dit quoi faire. */
 export function expliquerErreurGoogle(erreur: unknown, onglet: string, emailCompteService: string): string {
   const code = (erreur as { code?: unknown })?.code;
@@ -357,7 +394,7 @@ export function expliquerErreurGoogle(erreur: unknown, onglet: string, emailComp
     return 'Google Sheet introuvable. Vérifiez GOOGLE_SHEET_ID dans le .env (la partie entre /d/ et /edit dans l\'URL).';
   }
   if (code === 429 || code === '429') {
-    return 'Trop de requêtes vers Google (quota dépassé). Réessayer dans une minute.';
+    return 'Trop de requêtes vers Google (quota dépassé), même après plusieurs essais pendant près de 2 minutes.';
   }
   if (/Unable to parse range/i.test(message)) {
     return `Onglet « ${onglet} » introuvable. (Lancer « npm run installer-sheet ».)`;
